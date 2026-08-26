@@ -120,7 +120,34 @@ Funcionamos como equipo, no como vendedores compitiendo entre sí:
   aplicarlo.
 - **Escuchar** atentamente y preguntar si hace falta.
 
-## 1.9 Ejercicio
+## 1.9 Tips adicionales (recopilados de Slack)
+
+Consejos puntuales que se fueron pasando al equipo y dieron resultado:
+
+- **No abrir la conversación con un "Hola" solo.** Arrancar con algo concreto, como si fuera
+  un cliente real preguntando por un producto puntual (ej: *"Disculpa, te consulto por la
+  campera Alaska Perth en S, ¿la tenés?"*). El objetivo es que la charla dure al menos 3 o 4
+  mensajes antes de que se corte.
+- **Lista de espera con urgencia real.** Cuando hay gente esperando stock, mandarles un
+  mensaje del tipo: *"Avisame porfa si estás interesado, sino te tengo que borrar de la
+  lista de espera para darle tu lugar a otra persona y así no te seguimos mandando
+  mensajes"*. Genera que confirmen o se bajen solos, sin perder tiempo en seguimiento
+  infinito.
+- **Video de alguien con el mismo contexto para dudas de talle.** Si un cliente duda del
+  talle a distancia, mandar un video corto de alguien con altura/contextura similar
+  probándose esa talla puntual, aclarando la comparación — reduce mucho la duda antes de
+  comprar.
+- **Urgencia + regalo acotado en el tiempo para cerrar el mismo día.** Combinar un motivo de
+  urgencia real (una fecha, un evento) con un incentivo acotado ("si lo llevás entre hoy y
+  mañana tenés tal regalo") para empujar el cierre sin dejarlo para después.
+- **Cross-sell dirigido por categoría de compra anterior.** A quienes ya compraron cierto
+  tipo de producto, ofrecerles directamente algo relacionado nuevo de esa misma categoría —
+  convierte mejor que un mensaje genérico a toda la base.
+- **Reactivar carritos con una oferta concreta, no un mensaje genérico.** Para listas de
+  carritos frenados, ofrecer algo específico (ej: "comprá y retirá en el local con
+  descuento", con un cupón de %OFF) en vez de solo preguntar si siguen interesados.
+
+## 1.10 Ejercicio
 
 Repasá tu CRM ahora mismo: ¿tenés tarjetas en "más adelante" que ya deberían tener
 seguimiento? ¿Todas tus conversaciones activas en WhatsApp e Instagram están etiquetadas?
