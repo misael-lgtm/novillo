@@ -1,4 +1,4 @@
-# Módulo 6 – Métricas, seguimiento y mejora continua
+# Módulo 3 – Métricas, seguimiento y mejora continua
 
 ## 6.1 Por qué medir
 

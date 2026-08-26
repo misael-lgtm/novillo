@@ -1,4 +1,4 @@
-# Módulo 5 – Plan de ventas para fechas especiales (Cyber Monday, Hot Sale)
+# Módulo 4 – Plan de ventas para fechas especiales (Cyber Monday, Hot Sale)
 
 Para Cyber Monday, Hot Sale y fechas similares no alcanza con el Método Wayfarer del día a
 día: hay que armar un plan de ventas específico para el evento, usando la base de datos de
@@ -33,7 +33,7 @@ contactos y campañas de WhatsApp masivas.
 
 ## 5.4 Carritos abandonados en fecha especial
 
-Además del seguimiento habitual (Módulo 1.5), en fechas especiales se suma una acción
+Además del seguimiento habitual (Módulo 1.7), en fechas especiales se suma una acción
 puntual: unos días después del evento se pide un reporte de carritos abandonados de los
 últimos días del evento, y se les respeta la oferta **por ese día únicamente** a quienes no
 llegaron a comprar, para intentar recuperar ("repescar") la mayor cantidad posible.
@@ -55,7 +55,7 @@ A los clientes que más compraron se les da un trato diferencial durante el even
 
 ## 5.7 Métricas del evento
 
-Además de las métricas habituales del Módulo 4, en fechas especiales se suman:
+Además de las métricas habituales del Módulo 3, en fechas especiales se suman:
 
 - Cantidad de combos vendidos.
 - Cantidad de ventas por canal.

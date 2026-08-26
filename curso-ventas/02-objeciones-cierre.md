@@ -1,4 +1,4 @@
-# Módulo 5 – Manejo de objeciones y cierre
+# Módulo 2 – Manejo de objeciones y cierre
 
 ## 5.1 Las objeciones más comunes (y cómo responderlas)
 
