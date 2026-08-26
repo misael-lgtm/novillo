@@ -5,7 +5,8 @@
 Este curso reúne el proceso real que usamos para vender, tanto offline como por redes
 sociales (WhatsApp, Instagram). No es teoría genérica: está armado en base a cómo laburamos
 día a día — el orden del día, el seguimiento en el CRM, las reglas de carritos abandonados
-y de asignación de ventas.
+y de asignación de ventas — más el plan específico que usamos en fechas especiales como
+Cyber Monday y Hot Sale.
 
 La idea es tener un mismo criterio para todo el equipo: mismo proceso, mismo lenguaje,
 mismas herramientas de seguimiento — sin importar el canal por el que llega el cliente.
@@ -18,6 +19,7 @@ Al terminar este curso vas a poder:
 2. Vender por redes sociales siguiendo las mismas reglas de seguimiento y asignación.
 3. Manejar objeciones y cerrar ventas sin sonar agresivo.
 4. Medir resultados y mejorar el proceso con datos reales.
+5. Armar el plan de ventas para fechas especiales (Cyber Monday, Hot Sale).
 
 ## Estructura del curso
 
@@ -27,6 +29,7 @@ Al terminar este curso vas a poder:
 | 2 | Venta por redes sociales y canales digitales |
 | 3 | Manejo de objeciones y cierre |
 | 4 | Métricas, seguimiento y mejora continua |
+| 5 | Plan de ventas para fechas especiales (Cyber Monday, Hot Sale) |
 | Anexo | Checklists de uso diario |
 
 Cada módulo incluye un ejercicio práctico para aplicar en el día a día.

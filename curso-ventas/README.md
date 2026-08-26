@@ -1,7 +1,8 @@
 # Curso de Ventas: Método Wayfarer
 
 El proceso real que usamos para vender, offline y por redes sociales, en base al Método
-Wayfarer (orden del día, seguimiento en CRM, carritos abandonados, equipo).
+Wayfarer (orden del día, seguimiento en CRM, carritos abandonados, equipo) más el plan de
+ventas para fechas especiales.
 
 ## Índice
 
@@ -10,6 +11,7 @@ Wayfarer (orden del día, seguimiento en CRM, carritos abandonados, equipo).
 3. [Venta por redes sociales y canales digitales](02-venta-redes-sociales.md)
 4. [Manejo de objeciones y cierre](03-objeciones-cierre.md)
 5. [Métricas, seguimiento y mejora continua](04-metricas.md)
-6. [Anexo: Checklists de uso diario](05-checklists.md)
+6. [Plan de ventas para fechas especiales (Cyber Monday, Hot Sale)](05-plan-fechas-especiales.md)
+7. [Anexo: Checklists de uso diario](06-checklists.md)
 
 Cada módulo tiene un ejercicio práctico al final para aplicar en el negocio real.
