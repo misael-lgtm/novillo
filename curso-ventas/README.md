@@ -1,17 +1,15 @@
-# Curso de Ventas: Offline y Redes Sociales
+# Curso de Ventas: Método Wayfarer
 
-Todo lo que hacemos para vender, ordenado en un mismo proceso — sea cara a cara, por
-teléfono, en ferias/eventos o por redes sociales.
+El proceso real que usamos para vender, offline y por redes sociales, en base al Método
+Wayfarer (orden del día, seguimiento en CRM, carritos abandonados, equipo).
 
 ## Índice
 
 1. [Introducción y objetivos](00-introduccion.md)
-2. [Fundamentos de la venta](01-fundamentos.md)
-3. [Venta offline (cara a cara, teléfono, punto de venta)](02-venta-offline.md)
-4. [Venta por redes sociales y canales digitales](03-venta-redes-sociales.md)
-5. [Atención al cliente y postventa](04-atencion-postventa.md)
-6. [Manejo de objeciones y cierre](05-objeciones-cierre.md)
-7. [Métricas, seguimiento y mejora continua](06-metricas.md)
-8. [Anexo: Checklists de uso diario](07-checklists.md)
+2. [El Método Wayfarer](01-metodo-wayfarer.md)
+3. [Venta por redes sociales y canales digitales](02-venta-redes-sociales.md)
+4. [Manejo de objeciones y cierre](03-objeciones-cierre.md)
+5. [Métricas, seguimiento y mejora continua](04-metricas.md)
+6. [Anexo: Checklists de uso diario](05-checklists.md)
 
 Cada módulo tiene un ejercicio práctico al final para aplicar en el negocio real.
