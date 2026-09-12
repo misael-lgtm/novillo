@@ -24,6 +24,7 @@ Al terminar este curso vas a poder:
 3. Medir resultados y mejorar el proceso con datos reales.
 4. Armar el plan de ventas para fechas especiales (Cyber Monday, Hot Sale).
 5. Generar confianza ante un cliente desconfiado y adaptarte a cómo prefiere que le hablen.
+6. Asesorar bien el talle usando referencias reales del equipo y del producto.
 
 ## Estructura del curso
 
@@ -34,6 +35,7 @@ Al terminar este curso vas a poder:
 | 3 | Métricas, seguimiento y mejora continua |
 | 4 | Plan de ventas para fechas especiales (Cyber Monday, Hot Sale) |
 | 5 | Generar confianza y conocer al cliente |
+| 6 | Ayudar con el talle: conocé al equipo y al producto |
 | Anexo | Checklists de uso diario |
 
 Cada módulo incluye un ejercicio práctico para aplicar en el día a día.
