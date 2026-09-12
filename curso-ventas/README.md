@@ -11,6 +11,7 @@ fechas especiales.
 3. [Manejo de objeciones y cierre](02-objeciones-cierre.md)
 4. [Métricas, seguimiento y mejora continua](03-metricas.md)
 5. [Plan de ventas para fechas especiales (Cyber Monday, Hot Sale)](04-plan-fechas-especiales.md)
-6. [Anexo: Checklists de uso diario](05-checklists.md)
+6. [Generar confianza y conocer al cliente](05-confianza-conocer-cliente.md)
+7. [Anexo: Checklists de uso diario](06-checklists.md)
 
 Cada módulo tiene un ejercicio práctico al final para aplicar en el negocio real.
