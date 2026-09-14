@@ -13,6 +13,7 @@ fechas especiales.
 5. [Plan de ventas para fechas especiales (Cyber Monday, Hot Sale)](04-plan-fechas-especiales.md)
 6. [Generar confianza y conocer al cliente](05-confianza-conocer-cliente.md)
 7. [Ayudar con el talle: conocé al equipo y al producto](06-talles-equipo-producto.md)
-8. [Anexo: Checklists de uso diario](07-checklists.md)
+8. [Clientes VIP](07-clientes-vip.md)
+9. [Anexo: Checklists de uso diario](08-checklists.md)
 
 Cada módulo tiene un ejercicio práctico al final para aplicar en el negocio real.
