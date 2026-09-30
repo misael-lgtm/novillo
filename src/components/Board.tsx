@@ -197,14 +197,17 @@ function Card({
     >
       <Link href={`/pedidos/${order.id}`} className="block space-y-1" draggable={false}>
         <div className="flex items-center justify-between text-xs text-stone-500">
-          <span className="font-mono">#{order.number}</span>
+          <span className="font-mono">
+            #{order.number}
+            {order.kind === "cambio" && <span className="ml-1.5 rounded bg-violet-100 px-1.5 py-0.5 font-sans font-semibold text-violet-800">🔄 Cambio</span>}
+          </span>
           <span>{channelLabel(order.channel)}</span>
         </div>
         <p className="font-semibold leading-tight">{order.customer.name}</p>
         {order.customer.instagram && <p className="text-xs text-stone-500">@{order.customer.instagram}</p>}
         <p className="line-clamp-2 text-sm text-stone-700">{order.description}</p>
         <div className="flex items-center justify-between pt-1 text-xs">
-          <span className="font-semibold">{formatMoney(order.total)}</span>
+          <span className="font-semibold">{order.kind === "cambio" && order.total == null ? "Sin cargo" : formatMoney(order.total)}</span>
           <span className={stale ? "font-semibold text-amber-700" : "text-stone-500"}>
             {who} · {daysAgo(order.stage_changed_at)}
           </span>

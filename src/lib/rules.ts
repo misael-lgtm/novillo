@@ -81,6 +81,8 @@ export function formatMoney(n: number | null): string {
 // ── Requisitos por etapa ─────────────────────────────────────
 
 export type OrderFields = {
+  /** "cambio" = cambio de talle/prenda: puede ser sin cargo (sin monto ni pago). */
+  kind?: "venta" | "cambio";
   total: number | null;
   payment_method: string | null;
   shipping_address: string | null;
@@ -89,7 +91,7 @@ export type OrderFields = {
   cancel_reason: string | null;
 };
 
-export type RequiredField = keyof OrderFields;
+export type RequiredField = Exclude<keyof OrderFields, "kind">;
 
 export const FIELD_LABELS: Record<RequiredField, string> = {
   total: "Monto total",
@@ -100,14 +102,13 @@ export const FIELD_LABELS: Record<RequiredField, string> = {
   cancel_reason: "Motivo de cancelación",
 };
 
-const PAID: RequiredField[] = ["total", "payment_method"];
-const SHIPPED: RequiredField[] = [...PAID, "shipping_address", "carrier", "tracking_code"];
+const PAID: RequiredField[] = ["total", "payment_method", "shipping_address"];
+const SHIPPED: RequiredField[] = [...PAID, "carrier", "tracking_code"];
 
 export const STAGE_REQUIREMENTS: Record<StageId, RequiredField[]> = {
   consulta: [],
   esperando_pago: ["total"],
   pagado: PAID,
-  preparando: [...PAID, "shipping_address"],
   enviado: SHIPPED,
   entregado: SHIPPED,
   cancelado: ["cancel_reason"],
@@ -123,7 +124,11 @@ function isFilled(field: RequiredField, v: OrderFields[RequiredField]): boolean 
 
 /** Qué campos faltan para poder poner el pedido en esa etapa. */
 export function missingForStage(order: OrderFields, stage: StageId): RequiredField[] {
-  return STAGE_REQUIREMENTS[stage].filter((f) => !isFilled(f, order[f]));
+  // Un cambio sin cargo (sin monto) no necesita monto ni medio de pago.
+  const freeExchange = order.kind === "cambio" && order.total == null;
+  return STAGE_REQUIREMENTS[stage].filter(
+    (f) => !(freeExchange && (f === "total" || f === "payment_method")) && !isFilled(f, order[f]),
+  );
 }
 
 // ── Fechas ───────────────────────────────────────────────────

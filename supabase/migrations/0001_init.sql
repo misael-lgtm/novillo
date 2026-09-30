@@ -63,7 +63,9 @@ create table public.orders (
   customer_id      uuid not null references public.customers (id),
   channel          text not null check (channel in ('instagram', 'whatsapp', 'tienda_online', 'otro')),
   stage            text not null default 'consulta'
-                   check (stage in ('consulta', 'esperando_pago', 'pagado', 'preparando', 'enviado', 'entregado', 'cancelado')),
+                   check (stage in ('consulta', 'esperando_pago', 'pagado', 'enviado', 'entregado', 'cancelado')),
+  kind             text not null default 'venta' check (kind in ('venta', 'cambio')),
+  parent_order_id  uuid references public.orders (id),   -- en un cambio: el pedido original
   description      text not null check (length(trim(description)) >= 3),
   total            numeric(12, 2) check (total > 0),
   payment_method   text check (payment_method in ('transferencia', 'mercado_pago')),
@@ -79,12 +81,15 @@ create table public.orders (
   archived_at      timestamptz,
 
   -- Mismas reglas que STAGE_REQUIREMENTS en src/lib/rules.ts
+  -- Un cambio sin cargo (kind = 'cambio' y sin monto) no lleva monto ni medio de pago.
   constraint orders_total_required check (
-    stage in ('consulta', 'cancelado') or total is not null),
+    stage in ('consulta', 'cancelado') or total is not null or kind = 'cambio'),
   constraint orders_payment_required check (
-    stage not in ('pagado', 'preparando', 'enviado', 'entregado') or payment_method is not null),
+    stage not in ('pagado', 'enviado', 'entregado') or payment_method is not null or (kind = 'cambio' and total is null)),
   constraint orders_address_required check (
-    stage not in ('preparando', 'enviado', 'entregado') or nullif(trim(shipping_address), '') is not null),
+    stage not in ('pagado', 'enviado', 'entregado') or nullif(trim(shipping_address), '') is not null),
+  constraint orders_exchange_has_parent check (
+    (kind = 'cambio') = (parent_order_id is not null)),
   constraint orders_shipping_required check (
     stage not in ('enviado', 'entregado') or (carrier is not null and nullif(trim(tracking_code), '') is not null)),
   constraint orders_cancel_reason_required check (

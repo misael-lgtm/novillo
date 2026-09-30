@@ -24,12 +24,24 @@ Pensado para que sea **imposible cargar mal un pedido**.
 - **Sin clientes duplicados**: si cargás un cliente "nuevo" con un IG o celular que ya existe, usa el existente y te avisa.
 - **Nada se borra.** Se archiva. La base rechaza cualquier DELETE, incluso con la clave de admin.
 - **Historial completo**: cada cambio queda registrado con quién, qué y cuándo (ej: *"Sofi cambió el monto: $40.000 → $45.000"*).
-- **Tareas automáticas**: al pasar a una etapa se crea la tarea que corresponde ("Chequear si pagó", "Armar el paquete", "Confirmar que le llegó"…) y se cierran solas las de la etapa anterior.
+- **Etapas**: Consulta → Esperando pago → Pagado → Enviado → Entregado (+ Cancelado / Perdido).
+- **Cambios de talle / prenda**: en un pedido enviado o entregado, "Pedir cambio" crea un pedido de cambio vinculado al original. Sin cargo arranca en *Pagado*; si paga diferencia, en *Esperando pago*.
+- **Tareas automáticas**: al pasar a una etapa se crea la tarea que corresponde ("Chequear si pagó", "Armar y despachar", "Confirmar que le llegó"…) y se cierran solas las de la etapa anterior.
 - **Alertas**: las tarjetas que llevan más de 3 días sin moverse se marcan en naranja.
 - **Formularios que no pierden lo escrito** cuando hay un error.
 - **Solo entra el equipo** (login con Google + lista blanca de mails).
 
-## Cómo ponerlo en marcha (una sola vez, ~20 min)
+## App para vendedores (ya online)
+
+`app-vendedores/index.html` es una versión liviana del mismo CRM que corre como artifact de claude.ai,
+con base de datos compartida: https://claude.ai/artifact/JMTDZe8keySBXgHkY95aJz
+
+Se comparte desde el menú **Compartir** del artifact, dándole a cada vendedor acceso de **Colaborador**
+(con Lector solo pueden mirar). Tiene las mismas reglas por etapa, detección de clientes repetidos,
+tareas automáticas, cambios de talle, historial y archivo. Los datos viven en la base del artifact,
+separados de la versión completa de abajo.
+
+## Versión completa: cómo ponerla en marcha (una sola vez, ~20 min)
 
 ### 1. Supabase (base de datos + login)
 

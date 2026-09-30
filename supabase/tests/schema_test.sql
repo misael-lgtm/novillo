@@ -51,15 +51,23 @@ end $$;
 -- Reglas por etapa
 select pg_temp.expect_error($$update public.orders set stage = 'esperando_pago'$$, 'orders_total_required');
 update public.orders set stage = 'esperando_pago', total = 45000;
-select pg_temp.expect_error($$update public.orders set stage = 'pagado'$$, 'orders_payment_required');
-select pg_temp.expect_error($$update public.orders set stage = 'pagado', payment_method = 'bitcoin'$$, 'orders_payment_method_check');
-update public.orders set stage = 'pagado', payment_method = 'mercado_pago';
-select pg_temp.expect_error($$update public.orders set stage = 'preparando', shipping_address = '   '$$, 'orders_address_required');
-update public.orders set stage = 'preparando', shipping_address = 'Av. Siempreviva 742, CABA';
+select pg_temp.expect_error($$update public.orders set stage = 'pagado', shipping_address = 'Calle 1'$$, 'orders_payment_required');
+select pg_temp.expect_error($$update public.orders set stage = 'pagado', payment_method = 'bitcoin', shipping_address = 'Calle 1'$$, 'orders_payment_method_check');
+select pg_temp.expect_error($$update public.orders set stage = 'pagado', payment_method = 'mercado_pago', shipping_address = '   '$$, 'orders_address_required');
+select pg_temp.expect_error($$update public.orders set stage = 'preparando'$$, 'orders_stage_check');
+update public.orders set stage = 'pagado', payment_method = 'mercado_pago', shipping_address = 'Av. Siempreviva 742, CABA';
 select pg_temp.expect_error($$update public.orders set stage = 'enviado', carrier = 'andreani'$$, 'orders_shipping_required');
 update public.orders set stage = 'enviado', carrier = 'andreani', tracking_code = 'AND123';
 select pg_temp.expect_error($$update public.orders set stage = 'cancelado'$$, 'orders_cancel_reason_required');
 select pg_temp.expect_error($$update public.orders set stage = 'volando'$$, 'orders_stage_check');
+
+-- Cambios de talle
+select pg_temp.expect_error($$insert into public.orders (customer_id, channel, description, kind) select customer_id, channel, 'Cambio sin original', 'cambio' from public.orders$$, 'orders_exchange_has_parent');
+insert into public.orders (customer_id, channel, description, kind, parent_order_id, stage, shipping_address)
+  select customer_id, channel, 'Cambio: buzo L por M', 'cambio', id, 'pagado', shipping_address from public.orders where number = 1001;
+select pg_temp.expect_error($$update public.orders set total = 3000 where kind = 'cambio'$$, 'orders_payment_required');
+update public.orders set total = 3000, payment_method = 'transferencia' where kind = 'cambio';
+update public.orders set stage = 'cancelado', cancel_reason = 'test' where kind = 'cambio';
 
 -- Nada se borra
 select pg_temp.expect_error($$delete from public.orders$$, 'permission denied');
@@ -96,8 +104,8 @@ reset role;
 do $$
 declare kinds text;
 begin
-  select string_agg(kind, ',' order by id) into kinds from public.activity_log where entity = 'order';
-  if kinds <> 'created,stage,stage,stage,stage,note,archived' then
+  select string_agg(kind, ',' order by id) into kinds from public.activity_log where entity = 'order' and entity_id = (select id from public.orders where number = 1001);
+  if kinds <> 'created,stage,stage,stage,note,archived' then
     raise exception 'historial de pedido inesperado: %', kinds;
   end if;
   if (select changes -> 'stage' ->> 'a' from public.activity_log where entity = 'order' and kind = 'stage' order by id limit 1) <> 'esperando_pago' then

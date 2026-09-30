@@ -25,6 +25,8 @@ export type Order = {
   customer_id: string;
   channel: ChannelId;
   stage: StageId;
+  kind: "venta" | "cambio";
+  parent_order_id: string | null;
   description: string;
   total: number | null;
   payment_method: string | null;

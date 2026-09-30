@@ -68,8 +68,16 @@ describe("missingForStage", () => {
 
   it("consulta no pide nada", () => expect(missingForStage(empty, "consulta")).toEqual([]));
 
-  it("pagado pide monto y medio de pago", () =>
-    expect(missingForStage(empty, "pagado")).toEqual(["total", "payment_method"]));
+  it("pagado pide monto, medio de pago y dirección", () =>
+    expect(missingForStage(empty, "pagado")).toEqual(["total", "payment_method", "shipping_address"]));
+
+  it("un cambio sin cargo solo pide la dirección para pasar a pagado", () =>
+    expect(missingForStage({ ...empty, kind: "cambio" }, "pagado")).toEqual(["shipping_address"]));
+
+  it("un cambio con diferencia a pagar pide medio de pago", () =>
+    expect(missingForStage({ ...empty, kind: "cambio", total: 5000, shipping_address: "Calle 1" }, "pagado")).toEqual([
+      "payment_method",
+    ]));
 
   it("enviado pide seguimiento", () =>
     expect(
@@ -81,7 +89,7 @@ describe("missingForStage", () => {
 
   it("no acepta opciones inventadas ni texto en blanco", () =>
     expect(
-      missingForStage({ ...empty, total: 100, payment_method: "bitcoin", shipping_address: "  " }, "preparando"),
+      missingForStage({ ...empty, total: 100, payment_method: "bitcoin", shipping_address: "  " }, "pagado"),
     ).toEqual(["payment_method", "shipping_address"]));
 
   it("cancelado pide motivo", () =>

@@ -20,7 +20,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   if (!customer) notFound();
 
   const spent = (orders ?? [])
-    .filter((o) => !o.archived_at && ["pagado", "preparando", "enviado", "entregado"].includes(o.stage))
+    .filter((o) => !o.archived_at && ["pagado", "enviado", "entregado"].includes(o.stage))
     .reduce((sum, o) => sum + Number(o.total ?? 0), 0);
 
   return (

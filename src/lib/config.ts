@@ -23,17 +23,10 @@ export const STAGES = [
   },
   {
     id: "pagado",
-    label: "Pagado",
     color: "bg-emerald-50 border-emerald-300",
-    help: "La plata ya está. Hay que armar el paquete.",
-    followUp: { title: "Armar el paquete", inDays: 1 },
-  },
-  {
-    id: "preparando",
-    label: "Preparando",
-    color: "bg-sky-50 border-sky-300",
-    help: "El paquete se está armando / esperando despacho.",
-    followUp: { title: "Despachar y cargar el seguimiento", inDays: 2 },
+    label: "Pagado",
+    help: "La plata ya está. Hay que armar el paquete y despacharlo.",
+    followUp: { title: "Armar y despachar", inDays: 1 },
   },
   {
     id: "enviado",

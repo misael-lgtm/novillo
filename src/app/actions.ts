@@ -269,6 +269,58 @@ export async function createOrder(_prev: unknown, fd: FormData): Promise<ActionR
   };
 }
 
+/**
+ * Cambio de talle/prenda: crea un pedido nuevo vinculado al original.
+ * Sin diferencia a pagar → arranca en "Pagado" (listo para despachar).
+ * Con diferencia → arranca en "Esperando pago".
+ */
+export async function createExchange(orderId: string, _prev: unknown, fd: FormData): Promise<ActionResult<{ id: string }>> {
+  const { supabase, me } = await requireMember();
+  const { data: original } = await supabase.from("orders").select("*").eq("id", orderId).single<Order>();
+  if (!original) return { ok: false, error: "No encontré el pedido original." };
+  if (original.kind === "cambio") return { ok: false, error: "Pedí el cambio desde el pedido original." };
+
+  const fields: Record<string, string> = {};
+  const description = str(fd, "description");
+  if (!description || description.length < 3) fields.description = "Contá qué devuelve y qué se lleva";
+  const { patch, fields: moneyErrors } = readOrderFields(fd);
+  Object.assign(fields, moneyErrors);
+  const address = str(fd, "shipping_address") ?? original.shipping_address;
+  if (!address) fields.shipping_address = "¿A dónde le mandamos la prenda nueva?";
+  if (Object.keys(fields).length) return { ok: false, error: "Revisá los campos marcados.", fields };
+
+  const total = patch.total ?? null;
+  const stage: StageId = total ? "esperando_pago" : "pagado";
+  const { data, error } = await supabase
+    .from("orders")
+    .insert({
+      customer_id: original.customer_id,
+      channel: original.channel,
+      kind: "cambio",
+      parent_order_id: original.id,
+      description,
+      total,
+      stage,
+      shipping_address: address,
+      assigned_to: original.assigned_to,
+    })
+    .select("id, number")
+    .single<{ id: string; number: number }>();
+  if (error || !data) return { ok: false, error: friendly(error) };
+
+  await supabase.from("activity_log").insert({
+    entity: "order",
+    entity_id: original.id,
+    order_id: original.id,
+    kind: "note",
+    message: `Pidió un cambio → pedido #${data.number}: ${description}`,
+    actor: me.email,
+  });
+  await createFollowUp(data.id, data.number, stage, original.assigned_to);
+  refresh();
+  return { ok: true, data: { id: data.id }, message: `Cambio #${data.number} creado ✔` };
+}
+
 /** Mover de etapa. Si faltan datos para esa etapa, devuelve cuáles para pedirlos. */
 export async function moveOrder(orderId: string, stage: string, fd?: FormData): Promise<ActionResult> {
   const { supabase } = await requireMember();
