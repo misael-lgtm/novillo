@@ -11,7 +11,7 @@ const LINKS = [
   { href: "/tareas", label: "Tareas", icon: "✅" },
 ];
 
-export function Nav({ name, isAdmin }: { name: string; isAdmin: boolean }) {
+export function Nav({ name, isAdmin, shared }: { name: string; isAdmin: boolean; shared: boolean }) {
   const path = usePathname();
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
@@ -49,7 +49,13 @@ export function Nav({ name, isAdmin }: { name: string; isAdmin: boolean }) {
             <Link href="/archivo" className="text-stone-500 hover:text-stone-900">
               Archivo
             </Link>
-            <span className="hidden font-medium sm:inline">{name}</span>
+            {shared ? (
+              <Link href="/quien-soy" className="rounded-lg bg-stone-100 px-2.5 py-1 font-semibold hover:bg-stone-200" title="Cambiar de persona">
+                {name} <span className="font-normal text-stone-500">· cambiar</span>
+              </Link>
+            ) : (
+              <span className="hidden font-medium sm:inline">{name}</span>
+            )}
             <form action="/auth/logout" method="post">
               <button className="text-stone-500 hover:text-stone-900">Salir</button>
             </form>

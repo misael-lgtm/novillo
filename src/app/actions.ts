@@ -458,16 +458,32 @@ export async function postponeTask(taskId: string, days: number): Promise<Action
 export async function addMember(_prev: unknown, fd: FormData): Promise<ActionResult> {
   const { supabase, me } = await requireMember();
   if (!me.is_admin) return { ok: false, error: "Solo un admin puede sumar gente." };
-  const email = str(fd, "email")?.toLowerCase() ?? null;
   const name = str(fd, "name");
+  const loginEmail = str(fd, "login_email")?.toLowerCase() ?? null;
   const fields: Record<string, string> = {};
-  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fields.email = "Email inválido (el mail con el que va a entrar)";
+  const validEmail = (v: string | null) => !!v && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
   if (!name || name.length < 2) fields.name = "Poné el nombre";
+
+  let email: string | null;
+  if (fd.get("shared") === "on") {
+    // Casilla compartida: armamos un identificador propio para la persona (ventas+marian@...).
+    if (!validEmail(loginEmail)) fields.login_email = "Poné la casilla compartida (ej. ventas@wayfarerarg.com)";
+    const slug = (name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "");
+    if (name && !slug) fields.name = "Usá letras en el nombre";
+    const [user, domain] = (loginEmail ?? "@").split("@");
+    email = `${user}+${slug}@${domain}`;
+  } else {
+    email = str(fd, "email")?.toLowerCase() ?? null;
+    if (!validEmail(email)) fields.email = "Email inválido (el mail con el que va a entrar)";
+  }
   if (Object.keys(fields).length) return { ok: false, error: "Revisá los campos marcados.", fields };
 
-  const { error } = await supabase
-    .from("team_members")
-    .insert({ email, name, is_admin: fd.get("is_admin") === "on" });
+  const { error } = await supabase.from("team_members").insert({
+    email,
+    name,
+    login_email: fd.get("shared") === "on" ? loginEmail : null,
+    is_admin: fd.get("is_admin") === "on",
+  });
   if (error) return { ok: false, error: friendly(error) };
   refresh();
   return { ok: true, message: `${name} ya puede entrar ✔` };

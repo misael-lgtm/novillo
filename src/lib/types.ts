@@ -3,6 +3,8 @@ import type { ChannelId, StageId } from "./config";
 export type TeamMember = {
   email: string;
   name: string;
+  /** Casilla compartida con la que entra (ej. ventas@). null = entra con su propio mail. */
+  login_email: string | null;
   is_admin: boolean;
   active: boolean;
 };

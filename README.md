@@ -42,10 +42,16 @@ link y entran. Supabase y Vercel son gratis para este uso.
 1. Entrá a [supabase.com](https://supabase.com) → **Start your project** → registrate con GitHub.
 2. **New project**: nombre `wayfarer-crm`, inventá una contraseña (guardala), región **South America (São Paulo)** → *Create*.
 3. Menú izquierdo → **SQL Editor** → **New query** → pegá todo el contenido de `supabase/migrations/0001_init.sql` → **Run**. Tiene que decir *Success*.
-4. En otra query nueva, sumate como admin con **tu** mail y tocá **Run**:
+4. En otra query nueva, cargá al equipo y tocá **Run**. Ejemplo: vos como admin con tu mail, y dos
+   vendedores que entran con una casilla compartida (al entrar eligen "¿Quién sos?"):
    ```sql
-   insert into team_members (email, name, is_admin) values ('misael@wayfarerarg.com', 'Misael', true);
+   insert into team_members (email, name, is_admin, login_email) values
+     ('vos@tudominio.com',          'Vos',  true,  null),
+     ('ventas+ana@tudominio.com',   'Ana',  false, 'ventas@tudominio.com'),
+     ('ventas+juan@tudominio.com',  'Juan', false, 'ventas@tudominio.com');
    ```
+   `email` identifica a la persona; `login_email` es la casilla con la que entra si la comparte con otros.
+   Después podés sumar o desactivar gente desde la pantalla **Equipo**.
 5. **Authentication → URL Configuration**: en *Site URL* poné la dirección que te dé Vercel en el paso 2
    (podés volver a completarlo después) y en *Redirect URLs* agregá esa misma dirección seguida de `/auth/callback`.
 6. **Project Settings → API**: copiá *Project URL* y la clave *anon public*. Las usás en el paso 2.
@@ -69,8 +75,10 @@ link y entran. Supabase y Vercel son gratis para este uso.
 ### 3. Sumar a los vendedores
 
 1. Entrá vos a la dirección, poné tu mail y tocá el link que te llega.
-2. Andá a **Equipo** y sumá a cada vendedor con su nombre y su mail (Gmail, Hotmail, el que usen).
-3. Pasales la dirección. Cada uno pone su mail, abre el link **en la misma compu** y listo.
+2. Si no los cargaste en el paso 1.4, andá a **Equipo** y sumalos: con su propio mail, o con
+   "Entra con la casilla compartida".
+3. Pasales la dirección. Ponen su mail (o el de la casilla compartida), abren el link **en la misma compu**,
+   y si la casilla es compartida eligen su nombre. La compu se acuerda; para cambiar de persona, tocan su nombre arriba a la derecha.
    En el celu: *Agregar a pantalla de inicio* y queda como una app.
 
 Si alguien que no está en Equipo pone su mail, entra a una pantalla que dice que no tiene acceso: no ve nada.

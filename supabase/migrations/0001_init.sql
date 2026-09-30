@@ -11,9 +11,13 @@
 -- ═════════════════════════════════════════════════════════════
 
 -- ── Equipo ───────────────────────────────────────────────────
+-- Cada fila es una persona. `email` es su identificador (y su mail, si entra con uno propio).
+-- `login_email`: si varias personas comparten una casilla para entrar (ej. ventas@), va acá;
+-- al entrar con esa casilla, la app pregunta "¿Quién sos?" y todo queda a nombre de quien eligió.
 
 create table public.team_members (
   email       text primary key check (email = lower(trim(email)) and email like '%@%'),
+  login_email text check (login_email = lower(trim(login_email)) and login_email like '%@%'),
   name        text not null check (length(trim(name)) >= 2),
   is_admin    boolean not null default false,
   active      boolean not null default true,
@@ -25,14 +29,32 @@ language sql stable as $$
   select lower(coalesce(auth.jwt() ->> 'email', ''))
 $$;
 
+-- ¿Puede entrar este login? (mail propio o casilla compartida)
 create function public.is_team_member() returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.team_members where email = public.current_email() and active)
+  select exists (select 1 from public.team_members
+                 where coalesce(login_email, email) = public.current_email() and active)
+$$;
+
+-- La persona que está usando la app ahora.
+--  * Con mail propio: esa persona.
+--  * Con casilla compartida: la que eligió en "¿Quién sos?" (header x-crm-as), y SOLO si
+--    comparte esa casilla. Si no eligió a nadie válido, null (y no puede guardar nada).
+create function public.current_member() returns text
+language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select m.email from public.team_members m
+      where m.active
+        and coalesce(m.login_email, m.email) = public.current_email()
+        and m.email = lower(nullif(coalesce(nullif(current_setting('request.headers', true), ''), '{}')::json ->> 'x-crm-as', ''))),
+    (select m.email from public.team_members m
+      where m.active and m.login_email is null and m.email = public.current_email())
+  )
 $$;
 
 create function public.is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.team_members where email = public.current_email() and active and is_admin)
+  select exists (select 1 from public.team_members where email = public.current_member() and active and is_admin)
 $$;
 
 -- ── Clientes ─────────────────────────────────────────────────
@@ -45,7 +67,7 @@ create table public.customers (
   email       text check (email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   city        text,
   notes       text,
-  created_by  text not null default public.current_email(),
+  created_by  text not null default public.current_member(),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   archived_at timestamptz,
@@ -73,8 +95,8 @@ create table public.orders (
   carrier          text check (carrier in ('correo_argentino', 'andreani', 'oca')),
   tracking_code    text,
   cancel_reason    text,
-  assigned_to      text not null default public.current_email() references public.team_members (email),
-  created_by       text not null default public.current_email(),
+  assigned_to      text not null default public.current_member() references public.team_members (email),
+  created_by       text not null default public.current_member(),
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
   stage_changed_at timestamptz not null default now(),
@@ -104,13 +126,13 @@ create table public.tasks (
   id          uuid primary key default gen_random_uuid(),
   title       text not null check (length(trim(title)) >= 3),
   due_date    date not null,
-  assigned_to text not null default public.current_email() references public.team_members (email),
+  assigned_to text not null default public.current_member() references public.team_members (email),
   order_id    uuid references public.orders (id),
   customer_id uuid references public.customers (id),
   auto_stage  text,          -- si la creó el sistema al pasar un pedido a esa etapa
   done_at     timestamptz,
   done_by     text,
-  created_by  text not null default public.current_email(),
+  created_by  text not null default public.current_member(),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   archived_at timestamptz
@@ -128,7 +150,7 @@ create table public.activity_log (
   kind       text not null check (kind in ('created', 'updated', 'stage', 'archived', 'restored', 'done', 'reopened', 'note')),
   message    text,
   changes    jsonb,
-  actor      text not null default public.current_email(),
+  actor      text not null default coalesce(public.current_member(), 'sistema'),
   created_at timestamptz not null default now(),
   constraint activity_note_has_message check (kind <> 'note' or length(trim(message)) > 0)
 );
@@ -165,8 +187,10 @@ create trigger orders_stage_at before update on public.orders    for each row ex
 create function public.stamp_creator() returns trigger
 language plpgsql as $$
 begin
-  if public.current_email() <> '' then
-    new.created_by := public.current_email();
+  if public.current_member() is not null then
+    new.created_by := public.current_member();
+  elsif public.current_email() <> '' and public.is_team_member() then
+    raise exception 'Elegí quién sos antes de guardar.';
   end if;
   return new;
 end $$;
@@ -180,7 +204,7 @@ create function public.stamp_task_done() returns trigger
 language plpgsql as $$
 begin
   if new.done_at is not null and old.done_at is null then
-    new.done_by := coalesce(nullif(public.current_email(), ''), 'sistema');
+    new.done_by := coalesce(public.current_member(), 'sistema');
   elsif new.done_at is null then
     new.done_by := null;
   end if;
@@ -226,7 +250,7 @@ begin
   insert into public.activity_log (entity, entity_id, order_id, kind, message, changes, actor)
   values (v_entity, new.id, v_order, v_kind,
           case when v_entity = 'task' then n ->> 'title' end,
-          diff, coalesce(nullif(public.current_email(), ''), 'sistema'));
+          diff, coalesce(public.current_member(), 'sistema'));
   return new;
 end $$;
 
@@ -287,4 +311,4 @@ create policy tasks_update on public.tasks for update to authenticated using (pu
 -- El historial se lee; a mano solo se pueden agregar notas propias.
 create policy activity_read on public.activity_log for select to authenticated using (public.is_team_member());
 create policy activity_note on public.activity_log for insert to authenticated
-  with check (public.is_team_member() and kind = 'note' and actor = public.current_email());
+  with check (public.is_team_member() and kind = 'note' and actor = public.current_member());

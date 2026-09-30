@@ -96,6 +96,37 @@ select pg_temp.expect_error($$insert into public.team_members (email, name) valu
 set request.jwt.claims = '{"email":"admin@wayfarer.test"}';
 insert into public.team_members (email, name) values ('nuevo@x.com', 'Nuevo');
 
+-- ── Casilla compartida: ventas@ con "¿Quién sos?" ──
+insert into public.team_members (email, name, login_email) values
+  ('ventas+marian@wayfarer.test', 'Marian', 'ventas@wayfarer.test'),
+  ('ventas+bruno@wayfarer.test', 'Bruno', 'ventas@wayfarer.test');
+set request.jwt.claims = '{"email":"ventas@wayfarer.test"}';
+set request.headers = '{}';
+do $$ begin
+  if not public.is_team_member() then raise exception 'la casilla compartida no entra'; end if;
+  if (select count(*) from public.orders) = 0 then raise exception 'la casilla compartida no ve pedidos'; end if;
+  if public.current_member() is not null then raise exception 'sin elegir no debería haber persona'; end if;
+end $$;
+select pg_temp.expect_error($$insert into public.customers (name, instagram) values ('Sin elegir', 'sinelegir')$$, 'Elegí quién sos');
+-- intentar hacerse pasar por alguien que NO comparte la casilla
+set request.headers = '{"x-crm-as":"admin@wayfarer.test"}';
+select pg_temp.expect_error($$insert into public.customers (name, instagram) values ('Trucho', 'trucho')$$, 'Elegí quién sos');
+set request.headers = '{"x-crm-as":"ventas+marian@wayfarer.test"}';
+insert into public.customers (name, instagram, created_by) values ('Cliente de Marian', 'cliente.marian', 'ventas+bruno@wayfarer.test');
+insert into public.orders (customer_id, channel, description)
+  select id, 'whatsapp', 'Campera verde S' from public.customers where instagram = 'cliente.marian';
+do $$ begin
+  if (select created_by from public.customers where instagram = 'cliente.marian') <> 'ventas+marian@wayfarer.test' then raise exception 'created_by no es Marian'; end if;
+  if (select assigned_to from public.orders where description = 'Campera verde S') <> 'ventas+marian@wayfarer.test' then raise exception 'assigned_to no es Marian'; end if;
+  if (select actor from public.activity_log where entity = 'customer' order by id desc limit 1) <> 'ventas+marian@wayfarer.test' then raise exception 'el historial no dice Marian'; end if;
+  if public.is_admin() then raise exception 'Marian no es admin'; end if;
+end $$;
+insert into public.activity_log (entity, entity_id, order_id, kind, message, actor)
+  select 'order', id, id, 'note', 'nota de Marian', 'ventas+marian@wayfarer.test' from public.orders where description = 'Campera verde S';
+select pg_temp.expect_error($$insert into public.activity_log (entity, entity_id, kind, message, actor) select 'order', id, 'note', 'x', 'ventas+bruno@wayfarer.test' from public.orders limit 1$$, 'row-level security');
+reset request.headers;
+set request.jwt.claims = '{"email":"admin@wayfarer.test"}';
+
 -- Archivar
 update public.orders set archived_at = now();
 
