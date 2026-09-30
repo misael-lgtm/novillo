@@ -26,7 +26,7 @@ export function AddMemberForm() {
       <Field label="Nombre" name="name" error={err("name")} required>
         <input id="name" name="name" className="input" aria-invalid={!!err("name")} />
       </Field>
-      <Field label="Mail de Google" name="email" error={err("email")} hint="El mismo con el que va a tocar “Entrar con Google”" required>
+      <Field label="Mail" name="email" error={err("email")} hint="El mail con el que va a entrar (le llega un link ahí)" required>
         <input id="email" name="email" type="email" className="input" autoCapitalize="none" aria-invalid={!!err("email")} />
       </Field>
       <label className="flex items-center gap-2 text-sm">

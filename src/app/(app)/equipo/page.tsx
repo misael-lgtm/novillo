@@ -12,7 +12,7 @@ export default async function TeamPage() {
       <div>
         <h1 className="text-2xl font-bold">Equipo</h1>
         <p className="text-sm text-stone-500">
-          Solo entran al CRM las personas de esta lista, con su cuenta de Google. Si alguien se va, desactivalo (no se borra, así queda su historial).
+          Solo entran al CRM las personas de esta lista, con su mail. Si alguien se va, desactivalo (no se borra, así queda su historial).
         </p>
       </div>
       <ul className="card divide-y divide-stone-100">

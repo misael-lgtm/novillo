@@ -29,41 +29,62 @@ Pensado para que sea **imposible cargar mal un pedido**.
 - **Tareas automáticas**: al pasar a una etapa se crea la tarea que corresponde ("Chequear si pagó", "Armar y despachar", "Confirmar que le llegó"…) y se cierran solas las de la etapa anterior.
 - **Alertas**: las tarjetas que llevan más de 3 días sin moverse se marcan en naranja.
 - **Formularios que no pierden lo escrito** cuando hay un error.
-- **Solo entra el equipo** (login con Google + lista blanca de mails).
+- **Solo entra el equipo**: login con link al mail (sin contraseñas) y lista de mails autorizados.
 
-## App para vendedores (ya online)
+## Ponerlo online para el equipo (una sola vez, ~20 min)
 
-`app-vendedores/index.html` es una versión liviana del mismo CRM que corre como artifact de claude.ai,
-con base de datos compartida: https://claude.ai/artifact/JMTDZe8keySBXgHkY95aJz
-
-Se comparte desde el menú **Compartir** del artifact, dándole a cada vendedor acceso de **Colaborador**
-(con Lector solo pueden mirar). Tiene las mismas reglas por etapa, detección de clientes repetidos,
-tareas automáticas, cambios de talle, historial y archivo. Los datos viven en la base del artifact,
-separados de la versión completa de abajo.
-
-## Versión completa: cómo ponerla en marcha (una sola vez, ~20 min)
+Queda en una dirección propia (ej. `wayfarer-crm.vercel.app`). Los vendedores la abren en Chrome
+desde la compu o el celu **sin instalar nada y sin cuenta de Claude**: ponen su mail, les llega un
+link y entran. Supabase y Vercel son gratis para este uso.
 
 ### 1. Supabase (base de datos + login)
 
-1. Crear cuenta y proyecto en [supabase.com](https://supabase.com) (el plan gratis alcanza). Región: São Paulo.
-2. **SQL Editor** → pegar todo `supabase/migrations/0001_init.sql` → **Run**.
-3. En el mismo SQL Editor, sumarte como primer admin (con tu mail de Google):
+1. Entrá a [supabase.com](https://supabase.com) → **Start your project** → registrate con GitHub.
+2. **New project**: nombre `wayfarer-crm`, inventá una contraseña (guardala), región **South America (São Paulo)** → *Create*.
+3. Menú izquierdo → **SQL Editor** → **New query** → pegá todo el contenido de `supabase/migrations/0001_init.sql` → **Run**. Tiene que decir *Success*.
+4. En otra query nueva, sumate como admin con **tu** mail y tocá **Run**:
    ```sql
-   insert into team_members (email, name, is_admin) values ('tu-mail@gmail.com', 'Tu Nombre', true);
+   insert into team_members (email, name, is_admin) values ('misael@wayfarerarg.com', 'Misael', true);
    ```
-   Al resto del equipo lo sumás después desde la pantalla **Equipo**.
-4. **Authentication → Providers → Google**: activarlo. Pide un *Client ID* y *Secret* de Google Cloud ([guía oficial](https://supabase.com/docs/guides/auth/social-login/auth-google)).
-5. **Authentication → URL Configuration**: en *Site URL* poner la URL final (ej. `https://crm.wayfarerarg.com`) y en *Redirect URLs* agregar `https://crm.wayfarerarg.com/auth/callback` (y `http://localhost:3000/auth/callback` para probar local).
+5. **Authentication → URL Configuration**: en *Site URL* poné la dirección que te dé Vercel en el paso 2
+   (podés volver a completarlo después) y en *Redirect URLs* agregá esa misma dirección seguida de `/auth/callback`.
+6. **Project Settings → API**: copiá *Project URL* y la clave *anon public*. Las usás en el paso 2.
+7. (Recomendado) **Authentication → Email Templates → Magic Link**: cambiá el asunto a
+   `Tu link para entrar al CRM de Wayfarer` y el texto a
+   `<p>Tocá acá para entrar:</p><p><a href="{{ .ConfirmationURL }}">Entrar al CRM</a></p>`.
 
-### 2. Vercel (la app)
+> **Límite de mails:** el correo que trae Supabase de fábrica manda pocos mails por hora. Alcanza porque
+> cada vendedor entra una vez por compu y queda logueado. Si algún día dice "muchos links seguidos",
+> conectá un correo propio en *Authentication → SMTP Settings* (por ejemplo con Resend, que es gratis).
 
-1. Importar este repo en [vercel.com](https://vercel.com).
-2. En *Environment Variables* cargar (están en Supabase → Project Settings → API):
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. Deploy. Opcional: apuntar `crm.wayfarerarg.com` al proyecto.
+### 2. Vercel (la página)
 
-En el celu: abrir la URL en Chrome/Safari → *Agregar a pantalla de inicio*, y queda como una app.
+1. Entrá a [vercel.com](https://vercel.com) → registrate con GitHub.
+2. **Add New → Project** → elegí el repo `novillo` → **Import**.
+3. En **Environment Variables** agregá las dos del paso 1.6:
+   - `NEXT_PUBLIC_SUPABASE_URL` = el *Project URL*
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = la clave *anon public*
+4. **Deploy**. Al terminar te da la dirección (ej. `https://novillo.vercel.app`). Volvé a Supabase y completá el paso 1.5 con esa dirección.
+
+### 3. Sumar a los vendedores
+
+1. Entrá vos a la dirección, poné tu mail y tocá el link que te llega.
+2. Andá a **Equipo** y sumá a cada vendedor con su nombre y su mail (Gmail, Hotmail, el que usen).
+3. Pasales la dirección. Cada uno pone su mail, abre el link **en la misma compu** y listo.
+   En el celu: *Agregar a pantalla de inicio* y queda como una app.
+
+Si alguien que no está en Equipo pone su mail, entra a una pantalla que dice que no tiene acceso: no ve nada.
+
+### (Opcional) Botón "Entrar con Google"
+
+Activá Google en *Authentication → Providers* ([guía](https://supabase.com/docs/guides/auth/social-login/auth-google))
+y agregá en Vercel la variable `NEXT_PUBLIC_GOOGLE_LOGIN` = `true`.
+
+## Versión de prueba en claude.ai
+
+`app-vendedores/index.html` es una versión liviana publicada como artifact de claude.ai
+(https://claude.ai/artifact/JMTDZe8keySBXgHkY95aJz). Sirve para probar, pero cada persona necesita
+cuenta de Claude. Para el equipo usá la versión de arriba. Los datos de una y otra no se comparten.
 
 ## Cambiar etapas, canales, medios de pago o correos
 

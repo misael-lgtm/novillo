@@ -461,7 +461,7 @@ export async function addMember(_prev: unknown, fd: FormData): Promise<ActionRes
   const email = str(fd, "email")?.toLowerCase() ?? null;
   const name = str(fd, "name");
   const fields: Record<string, string> = {};
-  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fields.email = "Email inválido (el de Google con el que va a entrar)";
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fields.email = "Email inválido (el mail con el que va a entrar)";
   if (!name || name.length < 2) fields.name = "Poné el nombre";
   if (Object.keys(fields).length) return { ok: false, error: "Revisá los campos marcados.", fields };
 
