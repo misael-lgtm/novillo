@@ -31,6 +31,11 @@ Pensado para que sea **imposible cargar mal un pedido**.
 - **Formularios que no pierden lo escrito** cuando hay un error.
 - **Solo entra el equipo**: login con link al mail (sin contraseñas) y lista de mails autorizados.
 
+## Dónde está online
+
+**https://wayfarer-crm.vercel.app** (Vercel, proyecto `wayfarer-crm`; base en Supabase, proyecto `wayfarer-crm`).
+Cada cambio que entra a `main` se publica solo.
+
 ## Ponerlo online para el equipo (una sola vez, ~20 min)
 
 Queda en una dirección propia (ej. `wayfarer-crm.vercel.app`). Los vendedores la abren en Chrome
