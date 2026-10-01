@@ -3,12 +3,38 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/auth"];
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Página de error clara cuando falta configurar algo (en vez del 500 genérico de Vercel).
+function setupError(detail: string) {
+  const html = `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Falta configurar el CRM</title>
+<body style="font-family:system-ui;max-width:560px;margin:15vh auto;padding:0 20px;line-height:1.5;color:#1c1917">
+<h1 style="font-size:22px">Falta configurar el CRM</h1>
+<p>${detail}</p>
+<p style="color:#78716c;font-size:14px">En Vercel: proyecto → Settings → Environment Variables. Después: Deployments → ⋯ del último → Redeploy.</p>
+</body></html>`;
+  return new NextResponse(html, { status: 503, headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
 export async function middleware(request: NextRequest) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    return setupError(
+      `Faltan las variables ${!SUPABASE_URL ? "<b>NEXT_PUBLIC_SUPABASE_URL</b> " : ""}${!SUPABASE_KEY ? "<b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b>" : ""} en Vercel.`,
+    );
+  }
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(SUPABASE_URL) && !SUPABASE_URL.startsWith("http://localhost")) {
+    return setupError(
+      `La variable <b>NEXT_PUBLIC_SUPABASE_URL</b> tiene que ser solo la dirección del proyecto, tipo <code>https://abcd.supabase.co</code> (sin <code>/rest/v1</code> ni espacios).`,
+    );
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    SUPABASE_URL,
+    SUPABASE_KEY,
     {
       cookies: {
         getAll() {
@@ -23,9 +49,14 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    ({
+      data: { user },
+    } = await supabase.auth.getUser());
+  } catch {
+    // Si Supabase no responde, tratamos al visitante como no logueado (va al login) en vez de romper la página.
+  }
 
   const isPublic = PUBLIC_PATHS.some((p) => request.nextUrl.pathname.startsWith(p));
   if (!user && !isPublic) {
