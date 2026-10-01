@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Login con mail + contraseña. Los usuarios los crea el admin en Supabase
 // (Authentication → Users → Add user), así no depende de mandar mails.
@@ -45,7 +46,8 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
-      <div className="card w-full max-w-sm space-y-6 p-8">
+      <div className="card relative w-full max-w-sm space-y-6 p-8">
+        <ThemeToggle className="absolute right-3 top-3" />
         <div className="text-center">
           <h1 className="text-2xl font-black tracking-tight">WAYFARER</h1>
           <p className="text-sm text-stone-500">CRM del equipo</p>
