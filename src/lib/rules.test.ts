@@ -92,6 +92,13 @@ describe("missingForStage", () => {
       missingForStage({ ...empty, total: 100, payment_method: "bitcoin", shipping_address: "  " }, "pagado"),
     ).toEqual(["payment_method", "shipping_address"]));
 
+  it("historial de ClickUp: exento solo en la etapa con la que llegó", () => {
+    const imported = { ...empty, source: "clickup", source_stage: "entregado" };
+    expect(missingForStage(imported, "entregado")).toEqual([]);
+    expect(missingForStage({ ...imported, source_stage: "consulta" }, "entregado")).not.toEqual([]);
+    expect(missingForStage(imported, "pagado")).toEqual(["total", "payment_method", "shipping_address"]);
+  });
+
   it("cancelado pide motivo", () =>
     expect(missingForStage(empty, "cancelado")).toEqual(["cancel_reason"]));
 });

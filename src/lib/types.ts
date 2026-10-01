@@ -29,6 +29,9 @@ export type Order = {
   stage: StageId;
   kind: "venta" | "cambio";
   parent_order_id: string | null;
+  source: "clickup" | null;
+  source_ref: string | null;
+  source_stage: string | null;
   description: string;
   total: number | null;
   payment_method: string | null;

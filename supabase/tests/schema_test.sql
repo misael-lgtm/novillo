@@ -127,6 +127,23 @@ select pg_temp.expect_error($$insert into public.activity_log (entity, entity_id
 reset request.headers;
 set request.jwt.claims = '{"email":"admin@wayfarer.test"}';
 
+-- Historial importado de ClickUp: exento de datos solo en la etapa importada
+insert into public.orders (customer_id, channel, description, stage, source, source_ref, source_stage, assigned_to, created_by)
+  select id, 'instagram', 'Importado de ClickUp', 'entregado', 'clickup', 'VN-1', 'entregado', 'admin@wayfarer.test', 'admin@wayfarer.test'
+  from public.customers where instagram = 'juana.perez';
+insert into public.orders (customer_id, channel, description, stage, source, source_ref, source_stage, assigned_to, created_by)
+  select id, 'instagram', 'Importado de ClickUp', 'esperando_pago', 'clickup', 'VN-2', 'esperando_pago', 'admin@wayfarer.test', 'admin@wayfarer.test'
+  from public.customers where instagram = 'juana.perez';
+select pg_temp.expect_error($$update public.orders set stage = 'enviado' where source_ref = 'VN-1'$$, 'orders_');
+select pg_temp.expect_error($$update public.orders set stage = 'pagado' where source_ref = 'VN-2'$$, 'orders_');
+select pg_temp.expect_error($$insert into public.orders (customer_id, channel, description, stage, source, source_ref) select customer_id, channel, 'dup', 'consulta', 'clickup', 'VN-1' from public.orders limit 1$$, 'orders_source_ref_key');
+select pg_temp.expect_error($$insert into public.orders (customer_id, channel, description, stage) select customer_id, channel, 'sin source', 'entregado' from public.orders limit 1$$, 'orders_');
+-- un lead importado en Consulta no puede saltar a Entregado sin datos
+insert into public.orders (customer_id, channel, description, stage, source, source_ref, source_stage, assigned_to, created_by)
+  select id, 'instagram', 'Lead importado', 'consulta', 'clickup', 'VN-3', 'consulta', 'admin@wayfarer.test', 'admin@wayfarer.test'
+  from public.customers where instagram = 'juana.perez';
+select pg_temp.expect_error($$update public.orders set stage = 'entregado' where source_ref = 'VN-3'$$, 'orders_');
+
 -- Archivar
 update public.orders set archived_at = now();
 
@@ -136,7 +153,7 @@ do $$
 declare kinds text;
 begin
   select string_agg(kind, ',' order by id) into kinds from public.activity_log where entity = 'order' and entity_id = (select id from public.orders where number = 1001);
-  if kinds <> 'created,stage,stage,stage,note,archived' then
+  if kinds <> 'created,stage,stage,stage,note,archived' then -- solo #1001
     raise exception 'historial de pedido inesperado: %', kinds;
   end if;
   if (select changes -> 'stage' ->> 'a' from public.activity_log where entity = 'order' and kind = 'stage' order by id limit 1) <> 'esperando_pago' then
