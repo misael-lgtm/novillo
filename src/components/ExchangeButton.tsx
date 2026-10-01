@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { createExchange } from "@/app/actions";
 import { Field, Modal, ResultBanner, SubmitButton, fieldError, useFormAction } from "./ui";
 
-/** Botón "Pedir cambio" (talle / prenda) en pedidos enviados o entregados. */
+/** Botón "Pedir cambio" (talle / prenda) en pedidos que ya compró. */
 export function ExchangeButton({ orderId, address }: { orderId: string; address: string | null }) {
   const [open, setOpen] = useState(false);
   const [withDiff, setWithDiff] = useState(false);
@@ -52,7 +52,7 @@ export function ExchangeButton({ orderId, address }: { orderId: string; address:
               </Field>
             )}
             <p className="text-xs text-stone-500">
-              {withDiff ? "Se crea un pedido de cambio en Esperando pago." : "Se crea un pedido de cambio en Pagado, listo para despachar."}
+              {withDiff ? "Se crea un pedido de cambio en Esperando pago." : "Se crea un pedido de cambio en Compró, listo para despachar."}
             </p>
             {state && !state.ok && <ResultBanner state={state} />}
             <SubmitButton pending={pending} className="btn-primary w-full">

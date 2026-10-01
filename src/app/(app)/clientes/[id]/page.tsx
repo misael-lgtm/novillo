@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { STAGES } from "@/lib/config";
+import { SOLD_STAGE, STAGES } from "@/lib/config";
 import { formatDate, formatMoney } from "@/lib/rules";
 import { requireMember } from "@/lib/session";
 import type { Customer, Order } from "@/lib/types";
@@ -20,7 +20,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   if (!customer) notFound();
 
   const spent = (orders ?? [])
-    .filter((o) => !o.archived_at && ["pagado", "enviado", "entregado"].includes(o.stage))
+    .filter((o) => !o.archived_at && o.stage === SOLD_STAGE)
     .reduce((sum, o) => sum + Number(o.total ?? 0), 0);
 
   return (

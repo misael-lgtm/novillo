@@ -13,7 +13,7 @@ export function NewOrderForm({ team, me }: { team: TeamMember[]; me: string }) {
   const { state, onSubmit, pending } = useFormAction(createOrder);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isNew, setIsNew] = useState(false);
-  const [stage, setStage] = useState<"consulta" | "esperando_pago">("consulta");
+  const [stage, setStage] = useState<"primer_contacto" | "interesado" | "esperando_pago">("primer_contacto");
   const [formKey, setFormKey] = useState(0);
   const [lastCreated, setLastCreated] = useState<{ id: string; message?: string } | null>(null);
   const err = (f: string) => fieldError(state, f);
@@ -23,7 +23,7 @@ export function NewOrderForm({ team, me }: { team: TeamMember[]; me: string }) {
       setLastCreated({ id: state.data.id, message: state.message });
       setCustomer(null);
       setIsNew(false);
-      setStage("consulta");
+      setStage("primer_contacto");
       setFormKey((k) => k + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -107,7 +107,8 @@ export function NewOrderForm({ team, me }: { team: TeamMember[]; me: string }) {
           <div className="grid grid-cols-2 gap-2">
             {(
               [
-                ["consulta", "Solo preguntó"],
+                ["primer_contacto", "Recién escribe"],
+                ["interesado", "Le interesa algo"],
                 ["esperando_pago", "Confirmó, falta que pague"],
               ] as const
             ).map(([id, label]) => (

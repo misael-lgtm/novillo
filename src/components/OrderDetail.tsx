@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { moveOrder, updateOrder } from "@/app/actions";
-import { CARRIERS, CHANNELS, PAYMENT_METHODS, STAGES, type StageId } from "@/lib/config";
+import { CARRIERS, CHANNELS, LOST_STAGE, PAYMENT_METHODS, STAGES, nextStage, type StageId } from "@/lib/config";
 import { STAGE_REQUIREMENTS, missingForStage, type RequiredField } from "@/lib/rules";
 import type { OrderWithCustomer, TeamMember } from "@/lib/types";
 import { StageMoveDialog } from "./StageMoveDialog";
@@ -24,7 +24,7 @@ export function StageControls({ order }: { order: OrderWithCustomer }) {
     });
   }
 
-  const next = STAGES[currentIdx + 1] && STAGES[currentIdx + 1].id !== "cancelado" ? STAGES[currentIdx + 1] : null;
+  const next = nextStage(order.stage);
 
   return (
     <section className="card space-y-3 p-4">
@@ -39,9 +39,9 @@ export function StageControls({ order }: { order: OrderWithCustomer }) {
               className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
                 current
                   ? "border-stone-900 bg-stone-900 text-white"
-                  : i < currentIdx && s.id !== "cancelado"
+                  : i < currentIdx && s.id !== LOST_STAGE
                     ? "border-stone-200 text-stone-400 hover:border-stone-400"
-                    : s.id === "cancelado"
+                    : s.id === LOST_STAGE
                       ? "border-rose-200 text-rose-700 hover:bg-rose-50"
                       : "border-stone-300 hover:bg-stone-100"
               }`}
@@ -125,7 +125,7 @@ export function OrderEditForm({ order, team }: { order: OrderWithCustomer; team:
             </select>
           </Field>
         </div>
-        {order.stage === "cancelado" && (
+        {order.stage === LOST_STAGE && (
           <Field label="Motivo de cancelación" name="cancel_reason" error={err("cancel_reason")} required>
             <input id="cancel_reason" name="cancel_reason" defaultValue={order.cancel_reason ?? ""} className="input" />
           </Field>

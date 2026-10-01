@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { STAGES } from "@/lib/config";
+import { FINAL_STAGES, STAGES } from "@/lib/config";
 import { addDays, todayAR } from "@/lib/rules";
 import { getTeam, requireMember } from "@/lib/session";
 import type { TaskWithOrder } from "@/lib/types";
@@ -23,7 +23,7 @@ export default async function TodayPage() {
       .order("due_date")
       .limit(100)
       .returns<TaskWithOrder[]>(),
-    supabase.from("orders").select("stage, assigned_to").is("archived_at", null).not("stage", "in", "(entregado,cancelado)"),
+    supabase.from("orders").select("stage, assigned_to").is("archived_at", null).not("stage", "in", `(${FINAL_STAGES.join(",")})`),
   ]);
 
   const counts = Object.fromEntries(STAGES.map((s) => [s.id, 0]));
@@ -44,7 +44,7 @@ export default async function TodayPage() {
       </div>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {STAGES.filter((s) => s.id !== "entregado" && s.id !== "cancelado").map((s) => (
+        {STAGES.filter((s) => !FINAL_STAGES.includes(s.id)).map((s) => (
           <Link key={s.id} href={`/tablero#${s.id}`} className={`rounded-xl border p-4 transition hover:shadow ${s.color}`}>
             <p className="text-3xl font-black">{counts[s.id]}</p>
             <p className="text-sm font-medium">{s.label}</p>
