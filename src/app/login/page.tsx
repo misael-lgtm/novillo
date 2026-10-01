@@ -30,6 +30,8 @@ export default function LoginPage() {
       setLoading(false);
       if (error.code === "invalid_credentials" || error.status === 400) {
         setError("Mail o contraseña incorrectos. Fijate mayúsculas y que no haya espacios.");
+      } else if (/api key/i.test(error.message)) {
+        setError("La clave de Supabase cargada en Vercel no es la correcta. Avisale a Misael.");
       } else if (error.status === 429) {
         setError("Muchos intentos seguidos. Esperá un minuto y probá de nuevo.");
       } else {
