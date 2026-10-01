@@ -50,24 +50,23 @@ end $$;
 
 -- Reglas por etapa
 select pg_temp.expect_error($$update public.orders set stage = 'esperando_pago'$$, 'orders_total_required');
+update public.orders set stage = 'interesado';
 update public.orders set stage = 'esperando_pago', total = 45000;
-select pg_temp.expect_error($$update public.orders set stage = 'pagado', shipping_address = 'Calle 1'$$, 'orders_payment_required');
-select pg_temp.expect_error($$update public.orders set stage = 'pagado', payment_method = 'bitcoin', shipping_address = 'Calle 1'$$, 'orders_payment_method_check');
-select pg_temp.expect_error($$update public.orders set stage = 'pagado', payment_method = 'mercado_pago', shipping_address = '   '$$, 'orders_address_required');
-select pg_temp.expect_error($$update public.orders set stage = 'preparando'$$, 'orders_stage_check');
-update public.orders set stage = 'pagado', payment_method = 'mercado_pago', shipping_address = 'Av. Siempreviva 742, CABA';
-select pg_temp.expect_error($$update public.orders set stage = 'enviado', carrier = 'andreani'$$, 'orders_shipping_required');
-update public.orders set stage = 'enviado', carrier = 'andreani', tracking_code = 'AND123';
-select pg_temp.expect_error($$update public.orders set stage = 'cancelado'$$, 'orders_cancel_reason_required');
+select pg_temp.expect_error($$update public.orders set stage = 'compro'$$, 'orders_payment_required');
+select pg_temp.expect_error($$update public.orders set stage = 'compro', payment_method = 'bitcoin'$$, 'orders_payment_method_check');
+select pg_temp.expect_error($$update public.orders set stage = 'enviado'$$, 'orders_stage_check');
+update public.orders set stage = 'compro', payment_method = 'mercado_pago';
+select pg_temp.expect_error($$update public.orders set stage = 'sin_causa'$$, 'orders_cancel_reason_required');
+select pg_temp.expect_error($$update public.orders set stage = 'sin_causa', cancel_reason = '   '$$, 'orders_cancel_reason_required');
 select pg_temp.expect_error($$update public.orders set stage = 'volando'$$, 'orders_stage_check');
 
 -- Cambios de talle
 select pg_temp.expect_error($$insert into public.orders (customer_id, channel, description, kind) select customer_id, channel, 'Cambio sin original', 'cambio' from public.orders$$, 'orders_exchange_has_parent');
 insert into public.orders (customer_id, channel, description, kind, parent_order_id, stage, shipping_address)
-  select customer_id, channel, 'Cambio: buzo L por M', 'cambio', id, 'pagado', shipping_address from public.orders where number = 1001;
+  select customer_id, channel, 'Cambio: buzo L por M', 'cambio', id, 'compro', shipping_address from public.orders where number = 1001;
 select pg_temp.expect_error($$update public.orders set total = 3000 where kind = 'cambio'$$, 'orders_payment_required');
 update public.orders set total = 3000, payment_method = 'transferencia' where kind = 'cambio';
-update public.orders set stage = 'cancelado', cancel_reason = 'test' where kind = 'cambio';
+update public.orders set stage = 'sin_causa', cancel_reason = 'test' where kind = 'cambio';
 
 -- Nada se borra
 select pg_temp.expect_error($$delete from public.orders$$, 'permission denied');
@@ -129,20 +128,21 @@ set request.jwt.claims = '{"email":"admin@wayfarer.test"}';
 
 -- Historial importado de ClickUp: exento de datos solo en la etapa importada
 insert into public.orders (customer_id, channel, description, stage, source, source_ref, source_stage, assigned_to, created_by)
-  select id, 'instagram', 'Importado de ClickUp', 'entregado', 'clickup', 'VN-1', 'entregado', 'admin@wayfarer.test', 'admin@wayfarer.test'
+  select id, 'instagram', 'Importado de ClickUp', 'compro', 'clickup', 'VN-1', 'compro', 'admin@wayfarer.test', 'admin@wayfarer.test'
   from public.customers where instagram = 'juana.perez';
 insert into public.orders (customer_id, channel, description, stage, source, source_ref, source_stage, assigned_to, created_by)
   select id, 'instagram', 'Importado de ClickUp', 'esperando_pago', 'clickup', 'VN-2', 'esperando_pago', 'admin@wayfarer.test', 'admin@wayfarer.test'
   from public.customers where instagram = 'juana.perez';
-select pg_temp.expect_error($$update public.orders set stage = 'enviado' where source_ref = 'VN-1'$$, 'orders_');
-select pg_temp.expect_error($$update public.orders set stage = 'pagado' where source_ref = 'VN-2'$$, 'orders_');
-select pg_temp.expect_error($$insert into public.orders (customer_id, channel, description, stage, source, source_ref) select customer_id, channel, 'dup', 'consulta', 'clickup', 'VN-1' from public.orders limit 1$$, 'orders_source_ref_key');
-select pg_temp.expect_error($$insert into public.orders (customer_id, channel, description, stage) select customer_id, channel, 'sin source', 'entregado' from public.orders limit 1$$, 'orders_');
+update public.orders set stage = 'interesado' where source_ref = 'VN-1';
+select pg_temp.expect_error($$update public.orders set stage = 'compro' where source_ref = 'VN-1'$$, 'orders_');
+select pg_temp.expect_error($$update public.orders set stage = 'compro' where source_ref = 'VN-2'$$, 'orders_');
+select pg_temp.expect_error($$insert into public.orders (customer_id, channel, description, stage, source, source_ref) select customer_id, channel, 'dup', 'interesado', 'clickup', 'VN-1' from public.orders limit 1$$, 'orders_source_ref_key');
+select pg_temp.expect_error($$insert into public.orders (customer_id, channel, description, stage) select customer_id, channel, 'sin source', 'compro' from public.orders limit 1$$, 'orders_');
 -- un lead importado en Consulta no puede saltar a Entregado sin datos
 insert into public.orders (customer_id, channel, description, stage, source, source_ref, source_stage, assigned_to, created_by)
-  select id, 'instagram', 'Lead importado', 'consulta', 'clickup', 'VN-3', 'consulta', 'admin@wayfarer.test', 'admin@wayfarer.test'
+  select id, 'instagram', 'Lead importado', 'interesado', 'clickup', 'VN-3', 'interesado', 'admin@wayfarer.test', 'admin@wayfarer.test'
   from public.customers where instagram = 'juana.perez';
-select pg_temp.expect_error($$update public.orders set stage = 'entregado' where source_ref = 'VN-3'$$, 'orders_');
+select pg_temp.expect_error($$update public.orders set stage = 'compro' where source_ref = 'VN-3'$$, 'orders_');
 
 -- Archivar
 update public.orders set archived_at = now();
@@ -153,10 +153,10 @@ do $$
 declare kinds text;
 begin
   select string_agg(kind, ',' order by id) into kinds from public.activity_log where entity = 'order' and entity_id = (select id from public.orders where number = 1001);
-  if kinds <> 'created,stage,stage,stage,note,archived' then -- solo #1001
+  if kinds <> 'created,stage,stage,stage,note,archived' then -- solo #1001: interesado, esperando_pago, compro
     raise exception 'historial de pedido inesperado: %', kinds;
   end if;
-  if (select changes -> 'stage' ->> 'a' from public.activity_log where entity = 'order' and kind = 'stage' order by id limit 1) <> 'esperando_pago' then
+  if (select changes -> 'stage' ->> 'a' from public.activity_log where entity = 'order' and kind = 'stage' order by id limit 1) <> 'interesado' then
     raise exception 'diff de etapa mal';
   end if;
   if not exists (select 1 from public.activity_log where entity = 'task' and kind = 'done' and order_id is not null and actor = 'chico@wayfarer.test') then

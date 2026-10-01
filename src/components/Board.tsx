@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { moveOrder } from "@/app/actions";
-import { STAGES, channelLabel, type StageId } from "@/lib/config";
+import { FINAL_STAGES, STAGES, channelLabel, nextStage, type StageId } from "@/lib/config";
 import { formatMoney, missingForStage, type RequiredField } from "@/lib/rules";
 import type { OrderWithCustomer, TeamMember } from "@/lib/types";
 import { StageMoveDialog } from "./StageMoveDialog";
@@ -98,9 +98,9 @@ export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCus
 
       <DndContext id={dndId} sensors={sensors} onDragEnd={onDragEnd}>
         <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-4">
-          {STAGES.map((stage, i) => {
+          {STAGES.map((stage) => {
             const items = visible.filter((o) => o.stage === stage.id);
-            const next = STAGES[i + 1] && STAGES[i + 1].id !== "cancelado" ? STAGES[i + 1] : null;
+            const next = nextStage(stage.id);
             return (
               <Column key={stage.id} id={stage.id} label={stage.label} help={stage.help} color={stage.color} count={items.length}>
                 {items.map((o) => (
@@ -185,7 +185,7 @@ function Card({
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: order.id });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
-  const stale = Date.now() - Date.parse(order.stage_changed_at) > 3 * 86400000 && !["entregado", "cancelado"].includes(order.stage);
+  const stale = Date.now() - Date.parse(order.stage_changed_at) > 3 * 86400000 && !FINAL_STAGES.includes(order.stage);
 
   return (
     <article

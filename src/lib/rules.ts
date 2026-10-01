@@ -105,16 +105,20 @@ export const FIELD_LABELS: Record<RequiredField, string> = {
   cancel_reason: "Motivo de cancelación",
 };
 
-const PAID: RequiredField[] = ["total", "payment_method", "shipping_address"];
-const SHIPPED: RequiredField[] = [...PAID, "carrier", "tracking_code"];
-
+// Qué datos exige cada etapa. Las demás etapas (seguimiento) no piden nada extra.
 export const STAGE_REQUIREMENTS: Record<StageId, RequiredField[]> = {
-  consulta: [],
+  enviar_nuevamente: [],
+  primer_contacto: [],
+  interesado: [],
+  avanzado: [],
   esperando_pago: ["total"],
-  pagado: PAID,
-  enviado: SHIPPED,
-  entregado: SHIPPED,
-  cancelado: ["cancel_reason"],
+  promos_bancarias: [],
+  lista_de_espera: [],
+  mas_adelante: [],
+  promo_del_finde: [],
+  sin_causa: ["cancel_reason"],
+  hablar_de_nuevo: [],
+  compro: ["total", "payment_method"],
 };
 
 function isFilled(field: RequiredField, v: OrderFields[RequiredField]): boolean {
@@ -129,7 +133,7 @@ function isFilled(field: RequiredField, v: OrderFields[RequiredField]): boolean 
 export function missingForStage(order: OrderFields, stage: StageId): RequiredField[] {
   // Un cambio sin cargo (sin monto) no necesita monto ni medio de pago.
   // Igual que en la base (0002_clickup_import.sql): exento solo mientras siga en la etapa importada.
-  if (order.source === "clickup" && order.source_stage === stage && (stage === "entregado" || stage === "esperando_pago")) {
+  if (order.source === "clickup" && order.source_stage === stage && (stage === "compro" || stage === "esperando_pago")) {
     return [];
   }
   const freeExchange = order.kind === "cambio" && order.total == null;

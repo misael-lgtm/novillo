@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { STAGES, carrierLabel, channelLabel, trackingLink } from "@/lib/config";
+import { SOLD_STAGE, STAGES, carrierLabel, channelLabel, trackingLink } from "@/lib/config";
 import { ORDER_SELECT, TASK_SELECT } from "@/lib/queries";
 import { formatDate, formatMoney, formatPhone, todayAR } from "@/lib/rules";
 import { getTeam, memberName, requireMember } from "@/lib/session";
@@ -110,7 +110,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       </header>
 
       {!order.archived_at && <StageControls order={order} />}
-      {!order.archived_at && order.kind === "venta" && ["enviado", "entregado"].includes(order.stage) && (
+      {!order.archived_at && order.kind === "venta" && order.stage === SOLD_STAGE && (
         <ExchangeButton orderId={order.id} address={order.shipping_address} />
       )}
 

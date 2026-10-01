@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import {
   CARRIER_IDS,
   CHANNEL_IDS,
+  FIRST_STAGE,
   PAYMENT_METHOD_IDS,
+  SOLD_STAGE,
   STAGES,
   STAGE_IDS,
   type StageId,
@@ -227,7 +229,7 @@ export async function createOrder(_prev: unknown, fd: FormData): Promise<ActionR
   const description = str(fd, "description");
   if (!description || description.length < 3) fields.description = "Contá qué quiere (prenda, talle, color)";
 
-  const stage = oneOf(str(fd, "stage"), ["consulta", "esperando_pago"] as const) ?? "consulta";
+  const stage = oneOf(str(fd, "stage"), ["primer_contacto", "interesado", "esperando_pago"] as const) ?? FIRST_STAGE;
   const { patch, fields: moneyErrors } = readOrderFields(fd);
   Object.assign(fields, moneyErrors);
   if (stage === "esperando_pago" && !patch.total && !fields.total) fields.total = "Para esperar el pago necesitamos el monto";
@@ -271,7 +273,7 @@ export async function createOrder(_prev: unknown, fd: FormData): Promise<ActionR
 
 /**
  * Cambio de talle/prenda: crea un pedido nuevo vinculado al original.
- * Sin diferencia a pagar → arranca en "Pagado" (listo para despachar).
+ * Sin diferencia a pagar → arranca en "Compró" (listo para despachar).
  * Con diferencia → arranca en "Esperando pago".
  */
 export async function createExchange(orderId: string, _prev: unknown, fd: FormData): Promise<ActionResult<{ id: string }>> {
@@ -290,7 +292,7 @@ export async function createExchange(orderId: string, _prev: unknown, fd: FormDa
   if (Object.keys(fields).length) return { ok: false, error: "Revisá los campos marcados.", fields };
 
   const total = patch.total ?? null;
-  const stage: StageId = total ? "esperando_pago" : "pagado";
+  const stage: StageId = total ? "esperando_pago" : SOLD_STAGE;
   const { data, error } = await supabase
     .from("orders")
     .insert({

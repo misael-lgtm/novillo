@@ -66,41 +66,36 @@ describe("missingForStage", () => {
     cancel_reason: null,
   };
 
-  it("consulta no pide nada", () => expect(missingForStage(empty, "consulta")).toEqual([]));
-
-  it("pagado pide monto, medio de pago y dirección", () =>
-    expect(missingForStage(empty, "pagado")).toEqual(["total", "payment_method", "shipping_address"]));
-
-  it("un cambio sin cargo solo pide la dirección para pasar a pagado", () =>
-    expect(missingForStage({ ...empty, kind: "cambio" }, "pagado")).toEqual(["shipping_address"]));
-
-  it("un cambio con diferencia a pagar pide medio de pago", () =>
-    expect(missingForStage({ ...empty, kind: "cambio", total: 5000, shipping_address: "Calle 1" }, "pagado")).toEqual([
-      "payment_method",
-    ]));
-
-  it("enviado pide seguimiento", () =>
-    expect(
-      missingForStage(
-        { ...empty, total: 100, payment_method: "transferencia", shipping_address: "Calle 1", carrier: "oca" },
-        "enviado",
-      ),
-    ).toEqual(["tracking_code"]));
-
-  it("no acepta opciones inventadas ni texto en blanco", () =>
-    expect(
-      missingForStage({ ...empty, total: 100, payment_method: "bitcoin", shipping_address: "  " }, "pagado"),
-    ).toEqual(["payment_method", "shipping_address"]));
-
-  it("historial de ClickUp: exento solo en la etapa con la que llegó", () => {
-    const imported = { ...empty, source: "clickup", source_stage: "entregado" };
-    expect(missingForStage(imported, "entregado")).toEqual([]);
-    expect(missingForStage({ ...imported, source_stage: "consulta" }, "entregado")).not.toEqual([]);
-    expect(missingForStage(imported, "pagado")).toEqual(["total", "payment_method", "shipping_address"]);
+  it("las etapas de seguimiento no piden nada", () => {
+    for (const st of ["primer_contacto", "enviar_nuevamente", "interesado", "avanzado", "lista_de_espera", "mas_adelante", "hablar_de_nuevo"] as const)
+      expect(missingForStage(empty, st)).toEqual([]);
   });
 
-  it("cancelado pide motivo", () =>
-    expect(missingForStage(empty, "cancelado")).toEqual(["cancel_reason"]));
+  it("esperando pago pide el monto", () => expect(missingForStage(empty, "esperando_pago")).toEqual(["total"]));
+
+  it("compró pide monto y medio de pago", () =>
+    expect(missingForStage(empty, "compro")).toEqual(["total", "payment_method"]));
+
+  it("un cambio sin cargo puede pasar a compró sin monto ni pago", () =>
+    expect(missingForStage({ ...empty, kind: "cambio" }, "compro")).toEqual([]));
+
+  it("un cambio con diferencia a pagar pide medio de pago", () =>
+    expect(missingForStage({ ...empty, kind: "cambio", total: 5000 }, "compro")).toEqual(["payment_method"]));
+
+  it("no acepta opciones inventadas", () =>
+    expect(missingForStage({ ...empty, total: 100, payment_method: "bitcoin" }, "compro")).toEqual(["payment_method"]));
+
+  it("historial de ClickUp: exento solo en la etapa con la que llegó", () => {
+    const imported = { ...empty, source: "clickup", source_stage: "compro" };
+    expect(missingForStage(imported, "compro")).toEqual([]);
+    expect(missingForStage({ ...imported, source_stage: "interesado" }, "compro")).toEqual(["total", "payment_method"]);
+    expect(missingForStage({ ...imported, source_stage: "esperando_pago" }, "esperando_pago")).toEqual([]);
+  });
+
+  it("sin causa pide motivo (y no acepta texto en blanco)", () => {
+    expect(missingForStage(empty, "sin_causa")).toEqual(["cancel_reason"]);
+    expect(missingForStage({ ...empty, cancel_reason: "  " }, "sin_causa")).toEqual(["cancel_reason"]);
+  });
 });
 
 describe("fechas", () => {
