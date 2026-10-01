@@ -22,8 +22,9 @@ import {
   type OrderFields,
   type RequiredField,
 } from "@/lib/rules";
+import { FINAL_PAGE, ORDER_SELECT } from "@/lib/queries";
 import { requireMember } from "@/lib/session";
-import type { ActionResult, Customer, Order } from "@/lib/types";
+import type { ActionResult, Customer, Order, OrderWithCustomer } from "@/lib/types";
 
 // ── helpers ──────────────────────────────────────────────────
 
@@ -365,59 +366,113 @@ export async function moveOrder(orderId: string, stage: string, fd?: FormData): 
   return { ok: true, message: `#${order.number} → ${STAGES.find((s) => s.id === target)!.label}` };
 }
 
+/** Partir listas largas: la API no acepta miles de ids en un solo pedido. */
+function chunks<T>(xs: T[], size = 200): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += size) out.push(xs.slice(i, i + size));
+  return out;
+}
+
 /**
- * Mover varios pedidos juntos (seleccionados en el tablero).
+ * Mover varios pedidos juntos: los tildados en el tablero (`orderIds`) o una etapa entera (`fromStage`).
  * Los que no tienen los datos que pide la etapa no se mueven: se avisa cuáles quedaron.
  * Para "Sin causa" se puede mandar un motivo que se usa en los que no tienen uno.
  */
-export async function moveOrders(orderIds: string[], stage: string, cancelReason?: string): Promise<ActionResult<{ moved: string[] }>> {
+export async function moveOrders(
+  from: { orderIds: string[] } | { fromStage: string },
+  stage: string,
+  cancelReason?: string,
+): Promise<ActionResult<{ moved: string[] }>> {
   const { supabase } = await requireMember();
   const target = oneOf(stage, STAGE_IDS);
   if (!target) return { ok: false, error: "Etapa inválida." };
-  if (!orderIds.length) return { ok: false, error: "No elegiste ningún pedido." };
   const reason = cancelReason?.trim() || null;
 
-  const { data: orders, error: readError } = await supabase
-    .from("orders")
-    .select("*")
-    .in("id", orderIds)
-    .is("archived_at", null)
-    .neq("stage", target)
-    .returns<Order[]>();
-  if (readError) return { ok: false, error: friendly(readError) };
+  const orders: Order[] = [];
+  if ("orderIds" in from) {
+    if (!from.orderIds.length) return { ok: false, error: "No elegiste ningún pedido." };
+    for (const ids of chunks(from.orderIds)) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .in("id", ids)
+        .is("archived_at", null)
+        .neq("stage", target)
+        .returns<Order[]>();
+      if (error) return { ok: false, error: friendly(error) };
+      orders.push(...(data ?? []));
+    }
+  } else {
+    const source = oneOf(from.fromStage, STAGE_IDS);
+    if (!source) return { ok: false, error: "Etapa inválida." };
+    if (source === target) return { ok: false, error: "Ya están en esa etapa." };
+    // De a 1000 (es lo máximo que devuelve la API por vez).
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("stage", source)
+        .is("archived_at", null)
+        .order("id")
+        .range(offset, offset + 999)
+        .returns<Order[]>();
+      if (error) return { ok: false, error: friendly(error) };
+      orders.push(...(data ?? []));
+      if ((data?.length ?? 0) < 1000) break;
+    }
+    if (!orders.length) return { ok: false, error: "No hay pedidos en esa etapa." };
+  }
 
   const ok: Order[] = [];
   const needReason: Order[] = [];
   const skipped: Order[] = [];
-  for (const o of orders ?? []) {
+  for (const o of orders) {
     const lacksReason = target === "sin_causa" && !o.cancel_reason?.trim();
     if (missingForStage({ ...o, cancel_reason: lacksReason ? reason : o.cancel_reason }, target).length) skipped.push(o);
     else (lacksReason ? needReason : ok).push(o);
   }
 
-  if (ok.length) {
-    const { error } = await supabase.from("orders").update({ stage: target }).in("id", ok.map((o) => o.id));
+  for (const part of chunks(ok)) {
+    const { error } = await supabase.from("orders").update({ stage: target }).in("id", part.map((o) => o.id));
     if (error) return { ok: false, error: friendly(error) };
   }
-  if (needReason.length) {
+  for (const part of chunks(needReason)) {
     const { error } = await supabase
       .from("orders")
       .update({ stage: target, cancel_reason: reason })
-      .in("id", needReason.map((o) => o.id));
+      .in("id", part.map((o) => o.id));
     if (error) return { ok: false, error: friendly(error) };
   }
 
   const moved = [...ok, ...needReason];
-  await createFollowUps(moved, target);
+  for (const part of chunks(moved)) await createFollowUps(part, target);
   refresh();
 
   const label = STAGES.find((s) => s.id === target)!.label;
-  let message = `${moved.length} ${moved.length === 1 ? "pedido pasado" : "pedidos pasados"} a ${label} ✔`;
+  let message = moved.length
+    ? `${moved.length.toLocaleString("es-AR")} ${moved.length === 1 ? "pedido pasado" : "pedidos pasados"} a ${label} ✔`
+    : `No se movió ninguno a ${label}`;
   if (skipped.length) {
     const nums = skipped.slice(0, 10).map((o) => `#${o.number}`).join(", ");
     message += `. ${skipped.length} no se movieron porque les faltan datos (${nums}${skipped.length > 10 ? "…" : ""}): abrilos y completalos.`;
   }
   return { ok: true, data: { moved: moved.map((o) => o.id) }, message };
+}
+
+/** "Ver más" en las columnas Compró / Sin causa del tablero. */
+export async function loadMoreOrders(stage: string, offset: number): Promise<OrderWithCustomer[]> {
+  const { supabase } = await requireMember();
+  const target = oneOf(stage, STAGE_IDS);
+  if (!target || !Number.isInteger(offset) || offset < 0) return [];
+  const { data } = await supabase
+    .from("orders")
+    .select(ORDER_SELECT)
+    .is("archived_at", null)
+    .eq("stage", target)
+    .order("stage_changed_at", { ascending: false })
+    .range(offset, offset + FINAL_PAGE - 1)
+    .returns<OrderWithCustomer[]>();
+  return data ?? [];
 }
 
 export async function updateOrder(orderId: string, _prev: unknown, fd: FormData): Promise<ActionResult> {
