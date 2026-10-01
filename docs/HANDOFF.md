@@ -96,6 +96,7 @@ supabase/
   migrations/0003_clickup_stages.sql  etapas de ClickUp
   tests/schema_test.sql, auth_stub.sql, run.sh
 docs/HANDOFF.md                       este archivo
+  (components/ThemeToggle.tsx + lib/theme.ts = modo oscuro)
 ```
 
 **Patrones de código:**
@@ -421,7 +422,9 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
      - en el celu la columna termina arriba del menú inferior.
 3. En el tablero, las etapas finales (Compró y Sin causa) solo muestran los últimos 14 días. Las ventas viejas se ven en la ficha del cliente.
 
-**Historial de PRs:** #2 a #9, todos mergeados a `main`.
+4. **Modo oscuro** con botón 🌙/☀️ en el menú y en el login (ver §7).
+
+**Historial de PRs:** #2 a #9 y el del modo oscuro, todos mergeados a `main`.
 - #2: casilla compartida + "¿Quién sos?".
 - #3: README con la URL.
 - #4: página de error de configuración.
@@ -433,7 +436,58 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
 
 ---
 
-## 7. Cómo probar localmente (entorno que usó Claude)
+## 7. Estética que hay que mantener
+
+La idea es que se vea **sobria, limpia y fácil de tocar**, tipo herramienta de trabajo y no tipo página de marketing. Que lo pueda usar cualquiera sin explicación. Antes de agregar algo, copiá cómo están hechas las pantallas que ya existen.
+
+**Colores**
+- La base es la paleta **`stone`** de Tailwind, un gris cálido. Fondo de página `bg-stone-50`, texto `text-stone-900`, texto secundario `text-stone-500`, bordes `border-stone-200`/`300`. **No uses `gray`, `zinc` ni `neutral`**: se notaría la diferencia.
+- Los botones principales son **negro sobre blanco**: `bg-stone-900 text-white`. Lo mismo para la pestaña activa del menú y el "+" del menú del celu.
+- **El color solo se usa para dar significado**:
+  - Cada **etapa** tiene su color suave (`bg-<color>-50 border-<color>-300`), definido en `STAGES[].color` de `config.ts`: Primer contacto sky, Interesado violet, Avanzado lime, Esperando pago amber, Promos bancarias fuchsia, Lista de espera pink, Más adelante slate, Promo del finde orange, Sin causa rose, Hablar de nuevo teal, Compró green, Enviar nuevamente stone.
+  - Errores y lo peligroso en **rose** (`text-rose-600`, `bg-rose-50 text-rose-800`, `btn-danger`). Lo que salió bien en **emerald** (`bg-emerald-50 text-emerald-800`).
+  - Las tarjetas que llevan **más de 3 días sin moverse** tienen borde **amber-400** y el "hace X días" en `text-amber-700`. Los cambios usan **violet** (chip "🔄 Cambio").
+- **Si agregás una etapa nueva**, usá una de estas paletas, porque son las que el modo oscuro invierte: stone, rose, emerald, violet, amber, teal, slate, sky, pink, orange, lime, green, fuchsia. Si querés otra paleta, sumala a la lista de `html.dark` en `globals.css` (ver Modo oscuro).
+
+**Componentes y clases (en `src/app/globals.css`, con `@utility`)**
+- **`input`**: grande (`py-2.5`, `text-base`) para que en el celu no haga zoom; borde stone-300, foco negro. Los errores se marcan con `aria-invalid`.
+- **`btn`**: `rounded-lg px-4 py-2.5 text-sm font-semibold`. Variantes: **`btn-primary`** (negro), **`btn-secondary`** (blanco con borde), **`btn-danger`** (blanco con texto rose).
+- **`card`**: `rounded-xl border border-stone-200 bg-white`, sin sombra. Las sombras se usan solo en tarjetas del tablero (`shadow-sm`) y modales.
+- Bordes redondeados: `rounded-lg` (botones, inputs, chips) y `rounded-xl` (cards, columnas). Los chips y contadores son `rounded-full`.
+- En `src/components/ui.tsx` están `Field` (label + error/ayuda), `SubmitButton` (con texto "Guardando…"), `ResultBanner` (mensaje que se va solo a los 4 s) y `Modal` (sale desde abajo en el celu y al centro en la compu, con fondo `bg-black/40`). **Usalos** en lugar de hacer los tuyos.
+
+**Tipografía**
+- La fuente del sistema, sin fuentes externas.
+- Títulos de página `text-2xl font-bold`, títulos de sección `font-bold`/`text-lg`, el cuerpo en `text-sm`, la ayuda en `text-xs text-stone-500`. Los números de pedido van en `font-mono`.
+- El logo es la palabra **WAYFARER** en `font-black tracking-tight`, sin imagen. El ícono es `src/app/icon.svg`.
+
+**Disposición**
+- Contenido centrado `max-w-7xl` con `px-4`. Los formularios largos van en una columna angosta (por ejemplo Nuevo pedido, `max-w-xl`).
+- **En la compu**: menú arriba (sticky, `bg-white/90 backdrop-blur`) con Hoy, Tablero, "+ Nuevo pedido" (botón negro), Clientes y Tareas. A la derecha: modo oscuro, Equipo (admin), Archivo, el nombre (si es casilla compartida, "Nombre · cambiar") y Salir.
+- **En el celu**: barra fija abajo con 5 íconos emoji (☀️ 🗂️ ➕ 👥 ✅) y el "+" en un círculo negro. Todo tiene que poder tocarse con el dedo (mínimo ~40 px de alto).
+- **Tablero**: columnas de `w-72` con scroll horizontal y snap. Cada columna tiene su propio scroll vertical y el alto de la pantalla. Botón "Pasar a <siguiente> →" dentro de cada tarjeta.
+- Tarjeta del tablero: `#número` + canal, nombre en negrita, @ig, qué quiere (2 líneas como máximo), monto y "Vendedor · hace X días".
+
+**Textos (muy importante para este usuario)**
+- **Castellano rioplatense, con voseo**: "Elegí", "Tocá", "Pedísela a Misael", "Si todavía no sabés, dejalo vacío".
+- Cortos y sin palabras técnicas. Los errores dicen **qué hacer**: "Revisá el mail, parece que está mal escrito", no "Invalid email".
+- Cada opción tiene un nombre humano: "Recién escribe", "Le interesa algo", "Confirmó, falta que pague", "— Todavía no pagó —", "— Sin despachar —".
+- Las ayudas de cada etapa (`help` en `config.ts`) son una frase corta que explica qué significa.
+- Emojis, pocos y con sentido (👋 en el saludo, 🔄 en los cambios, los íconos del menú del celu).
+
+**Modo oscuro**
+- Lo prende y apaga el **botón 🌙/☀️** (`src/components/ThemeToggle.tsx`), que está en el menú de arriba y en la pantalla de login.
+- La elección se guarda en el navegador (`localStorage`, clave `crm_theme`). Si la persona nunca eligió, sigue al modo del sistema operativo.
+- `src/lib/theme.ts` tiene un script que corre en el `<head>` (`layout.tsx`) **antes de pintar**, para que no aparezca un destello blanco al cargar.
+- **Cómo funciona**: no hay clases `dark:` sueltas por la app. En `globals.css`, cuando `html` tiene la clase `dark`, se **invierten las paletas** (50↔950, 100↔900, 200↔800, 300↔700, 400↔600; 500 queda igual) y `white` pasa a ser el gris oscuro de las tarjetas (`oklch(18% 0.005 52)`). Así **todo lo que ya existe y lo que se agregue** cambia solo, siempre que use las clases de colores de Tailwind de la lista de arriba.
+- Consecuencias: `bg-stone-900 text-white` (botón principal) se ve **claro con texto oscuro** en modo oscuro, y eso es intencional. Los colores de las etapas se ven en versión oscura del mismo tono.
+- Si alguna vez hace falta algo que **no** se invierta, existe la variante `dark:` (`@custom-variant dark`) para casos puntuales.
+- **No pongas colores fijos** (hex, `rgb()`, `style={{color}}`): no cambian con el modo oscuro.
+- Se probó con Playwright: arranca claro, el botón lo pasa a oscuro, se acuerda al recargar, vuelve a claro, y sin elección guardada sigue al sistema. Hay capturas de Hoy, Tablero, Nuevo pedido, Pedido y Login.
+
+---
+
+## 8. Cómo probar localmente (entorno que usó Claude)
 
 Nada de esto está en el repo, salvo `supabase/tests/`. Vive en el contenedor y **puede no existir** en otra sesión.
 
@@ -455,7 +509,7 @@ Nada de esto está en el repo, salvo `supabase/tests/`. Vive en el contenedor y 
 
 ---
 
-## 8. Pendientes / ideas
+## 9. Pendientes / ideas
 
 1. **Esperando respuesta del usuario:** ¿renombrar en ClickUp el estado "cerrado" a "Compró"? Es un cambio hacia afuera: preguntar antes de hacerlo.
 2. **92 ventas de ClickUp sin contacto** que no se importaron (§5.2). Opciones:
@@ -470,7 +524,7 @@ Nada de esto está en el repo, salvo `supabase/tests/`. Vive en el contenedor y 
 
 ---
 
-## 9. Problemas que aparecieron y cómo se resolvieron (para no repetirlos)
+## 10. Problemas que aparecieron y cómo se resolvieron (para no repetirlos)
 
 | Problema | Causa | Solución |
 |---|---|---|
@@ -493,7 +547,7 @@ Nada de esto está en el repo, salvo `supabase/tests/`. Vive en el contenedor y 
 
 ---
 
-## 10. Cómo trabajar con este usuario (preferencias observadas)
+## 11. Cómo trabajar con este usuario (preferencias observadas)
 
 - Siempre en **español rioplatense**, corto y concreto.
 - Si algo tarda, avisarle en una línea qué estás haciendo.

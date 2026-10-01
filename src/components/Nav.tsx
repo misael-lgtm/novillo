@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ThemeToggle } from "./ThemeToggle";
 
 const LINKS = [
   { href: "/", label: "Hoy", icon: "☀️" },
@@ -41,6 +42,7 @@ export function Nav({ name, isAdmin, shared }: { name: string; isAdmin: boolean;
             )}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <ThemeToggle />
             {isAdmin && (
               <Link href="/equipo" className="text-stone-500 hover:text-stone-900">
                 Equipo
