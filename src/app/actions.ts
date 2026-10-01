@@ -92,24 +92,32 @@ function readOrderFields(fd: FormData): { patch: Partial<OrderFields>; fields: R
 }
 
 async function createFollowUp(orderId: string, orderNumber: number, stage: StageId, assignee: string) {
+  await createFollowUps([{ id: orderId, number: orderNumber, assigned_to: assignee }], stage);
+}
+
+/** Igual que createFollowUp pero para varios pedidos a la vez (mover una lista entera). */
+async function createFollowUps(orders: { id: string; number: number; assigned_to: string }[], stage: StageId) {
+  if (!orders.length) return;
   const { supabase } = await requireMember();
   // Cerrar las tareas automáticas de la etapa anterior: ya no aplican.
   await supabase
     .from("tasks")
     .update({ done_at: new Date().toISOString() })
-    .eq("order_id", orderId)
+    .in("order_id", orders.map((o) => o.id))
     .not("auto_stage", "is", null)
     .is("done_at", null);
 
   const followUp = STAGES.find((s) => s.id === stage)?.followUp;
   if (!followUp) return;
-  await supabase.from("tasks").insert({
-    title: `${followUp.title} (#${orderNumber})`,
-    due_date: addDays(todayAR(), followUp.inDays),
-    assigned_to: assignee,
-    order_id: orderId,
-    auto_stage: stage,
-  });
+  await supabase.from("tasks").insert(
+    orders.map((o) => ({
+      title: `${followUp.title} (#${o.number})`,
+      due_date: addDays(todayAR(), followUp.inDays),
+      assigned_to: o.assigned_to,
+      order_id: o.id,
+      auto_stage: stage,
+    })),
+  );
 }
 
 // ── Clientes ─────────────────────────────────────────────────
@@ -137,7 +145,9 @@ export async function searchCustomers(q: string): Promise<Customer[]> {
   return data ?? [];
 }
 
-type CustomerInput = { name: string | null; instagram: string | null; phone: string | null };
+type CustomerInput = { name: string | null; instagram: string | null; phone: string | null; email?: string | null };
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 function validateCustomer(fd: FormData, prefix = ""): { input: CustomerInput; fields: Record<string, string> } {
   const fields: Record<string, string> = {};
@@ -169,12 +179,14 @@ async function findOrCreateCustomer(input: CustomerInput): Promise<ActionResult<
     .maybeSingle<{ id: string; archived_at: string | null }>();
   if (existing) {
     if (existing.archived_at) await supabase.from("customers").update({ archived_at: null }).eq("id", existing.id);
+    // Si ya existía sin mail, le queda el que se cargó ahora.
+    if (input.email) await supabase.from("customers").update({ email: input.email }).eq("id", existing.id).is("email", null);
     return { ok: true, data: { id: existing.id, existed: true } };
   }
 
   const { data, error } = await supabase
     .from("customers")
-    .insert({ name: input.name, instagram: input.instagram, phone: input.phone })
+    .insert({ name: input.name, instagram: input.instagram, phone: input.phone, email: input.email ?? null })
     .select("id")
     .single<{ id: string }>();
   if (error || !data) return { ok: false, error: friendly(error) };
@@ -186,7 +198,7 @@ export async function updateCustomer(id: string, _prev: unknown, fd: FormData): 
   const { input, fields } = validateCustomer(fd);
   const rawEmail = str(fd, "email");
   const email = rawEmail?.toLowerCase() ?? null;
-  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fields.email = "Email inválido";
+  if (email && !EMAIL_RE.test(email)) fields.email = "Email inválido";
   if (Object.keys(fields).length) return { ok: false, error: "Revisá los campos marcados.", fields };
 
   const { error } = await supabase
@@ -220,7 +232,11 @@ export async function createOrder(_prev: unknown, fd: FormData): Promise<ActionR
   if (!customerId) {
     const v = validateCustomer(fd, "new_");
     Object.assign(fields, v.fields);
-    customerInput = v.input;
+    // Para los contactos nuevos el mail es obligatorio.
+    const email = str(fd, "new_email")?.toLowerCase() ?? null;
+    if (!email) fields.new_email = "Poné el mail";
+    else if (!EMAIL_RE.test(email)) fields.new_email = "Mail inválido. Ej: juana@gmail.com";
+    customerInput = { ...v.input, email };
   }
 
   const channel = oneOf(str(fd, "channel"), CHANNEL_IDS);
@@ -347,6 +363,61 @@ export async function moveOrder(orderId: string, stage: string, fd?: FormData): 
   await createFollowUp(order.id, order.number, target, order.assigned_to);
   refresh();
   return { ok: true, message: `#${order.number} → ${STAGES.find((s) => s.id === target)!.label}` };
+}
+
+/**
+ * Mover varios pedidos juntos (seleccionados en el tablero).
+ * Los que no tienen los datos que pide la etapa no se mueven: se avisa cuáles quedaron.
+ * Para "Sin causa" se puede mandar un motivo que se usa en los que no tienen uno.
+ */
+export async function moveOrders(orderIds: string[], stage: string, cancelReason?: string): Promise<ActionResult<{ moved: string[] }>> {
+  const { supabase } = await requireMember();
+  const target = oneOf(stage, STAGE_IDS);
+  if (!target) return { ok: false, error: "Etapa inválida." };
+  if (!orderIds.length) return { ok: false, error: "No elegiste ningún pedido." };
+  const reason = cancelReason?.trim() || null;
+
+  const { data: orders, error: readError } = await supabase
+    .from("orders")
+    .select("*")
+    .in("id", orderIds)
+    .is("archived_at", null)
+    .neq("stage", target)
+    .returns<Order[]>();
+  if (readError) return { ok: false, error: friendly(readError) };
+
+  const ok: Order[] = [];
+  const needReason: Order[] = [];
+  const skipped: Order[] = [];
+  for (const o of orders ?? []) {
+    const lacksReason = target === "sin_causa" && !o.cancel_reason?.trim();
+    if (missingForStage({ ...o, cancel_reason: lacksReason ? reason : o.cancel_reason }, target).length) skipped.push(o);
+    else (lacksReason ? needReason : ok).push(o);
+  }
+
+  if (ok.length) {
+    const { error } = await supabase.from("orders").update({ stage: target }).in("id", ok.map((o) => o.id));
+    if (error) return { ok: false, error: friendly(error) };
+  }
+  if (needReason.length) {
+    const { error } = await supabase
+      .from("orders")
+      .update({ stage: target, cancel_reason: reason })
+      .in("id", needReason.map((o) => o.id));
+    if (error) return { ok: false, error: friendly(error) };
+  }
+
+  const moved = [...ok, ...needReason];
+  await createFollowUps(moved, target);
+  refresh();
+
+  const label = STAGES.find((s) => s.id === target)!.label;
+  let message = `${moved.length} ${moved.length === 1 ? "pedido pasado" : "pedidos pasados"} a ${label} ✔`;
+  if (skipped.length) {
+    const nums = skipped.slice(0, 10).map((o) => `#${o.number}`).join(", ");
+    message += `. ${skipped.length} no se movieron porque les faltan datos (${nums}${skipped.length > 10 ? "…" : ""}): abrilos y completalos.`;
+  }
+  return { ok: true, data: { moved: moved.map((o) => o.id) }, message };
 }
 
 export async function updateOrder(orderId: string, _prev: unknown, fd: FormData): Promise<ActionResult> {
