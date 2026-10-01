@@ -423,8 +423,16 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
 3. En el tablero, las etapas finales (Compró y Sin causa) solo muestran los últimos 14 días. Las ventas viejas se ven en la ficha del cliente.
 
 4. **Modo oscuro** con botón 🌙/☀️ en el menú y en el login (ver §7).
+5. **Mover muchas tarjetas juntas** (tablero → "☑️ Seleccionar"): se tocan tarjetas o "Elegir todas (N)" arriba de cada columna, y abajo aparece una barra "N elegidos · Pasar a… · Mover".
+   - Va por `moveOrders(ids, etapa, motivo?)` en `src/app/actions.ts`.
+   - Hace lo mismo que mover de a una: cierra las tareas automáticas viejas y crea la de seguimiento (`createFollowUps`, en lote).
+   - Los pedidos a los que les faltan datos para la etapa (monto o medio de pago para Compró/Esperando pago) **no se mueven**; el mensaje dice cuáles quedaron.
+   - Para "Sin causa" pide un motivo que se aplica a los que no tienen.
+   - Pide confirmación antes de mover.
+6. **Mail obligatorio para contactos nuevos** (Nuevo pedido → "Es un cliente nuevo"): además de IG o celular. Se valida solo en el servidor (`createOrder`, campo `new_email`), **no** en la base: los ~9.500 clientes importados no tienen mail. Si el contacto ya existía y no tenía mail, se le guarda. En la ficha del cliente el mail sigue siendo opcional.
+7. 1/10/2026: los 2 pedidos de "Hablar de nuevo" (#8459, #8584) se pasaron a "Más adelante" por SQL a pedido del usuario, con su tarea "Volver a contactar" para el 31/10 (`created_by` = misael).
 
-**Historial de PRs:** #2 a #9 y el del modo oscuro, todos mergeados a `main`.
+**Historial de PRs:** #2 a #11, todos mergeados a `main`.
 - #2: casilla compartida + "¿Quién sos?".
 - #3: README con la URL.
 - #4: página de error de configuración.
@@ -433,6 +441,8 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
 - #7: historial de ClickUp.
 - #8: etapas de ClickUp.
 - #9: scroll del tablero.
+- #10: modo oscuro + este handoff.
+- #11: seleccionar y mover muchas tarjetas + mail obligatorio.
 
 ---
 
