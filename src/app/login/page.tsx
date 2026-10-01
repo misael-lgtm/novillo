@@ -1,52 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-// El botón de Google aparece solo si se configuró (ver README). El link por mail anda siempre.
-const GOOGLE_ENABLED = process.env.NEXT_PUBLIC_GOOGLE_LOGIN === "true";
-
+// Login con mail + contraseña. Los usuarios los crea el admin en Supabase
+// (Authentication → Users → Add user), así no depende de mandar mails.
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).has("error")) {
-      setError("El link venció o ya se usó. Pedí uno nuevo.");
-    }
-  }, []);
-
-  async function sendLink(e: React.FormEvent) {
+  async function signIn(e: React.FormEvent) {
     e.preventDefault();
     const clean = email.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) {
       setError("Revisá el mail, parece que está mal escrito.");
       return;
     }
-    setError(null);
-    setStatus("sending");
-    const { error } = await createClient().auth.signInWithOtp({
-      email: clean,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    });
-    if (error) {
-      setStatus("idle");
-      setError(
-        error.status === 429
-          ? "Se pidieron muchos links seguidos. Esperá unos minutos y probá de nuevo."
-          : "No pudimos mandar el mail. Probá de nuevo en un rato.",
-      );
+    if (!password) {
+      setError("Poné la contraseña.");
       return;
     }
-    setStatus("sent");
-  }
-
-  async function google() {
-    await createClient().auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
+    setError(null);
+    setLoading(true);
+    const { error } = await createClient().auth.signInWithPassword({ email: clean, password });
+    if (error) {
+      setLoading(false);
+      if (error.code === "invalid_credentials" || error.status === 400) {
+        setError("Mail o contraseña incorrectos. Fijate mayúsculas y que no haya espacios.");
+      } else if (error.status === 429) {
+        setError("Muchos intentos seguidos. Esperá un minuto y probá de nuevo.");
+      } else {
+        setError(`No pudimos entrar (${error.message}). Probá de nuevo en un rato.`);
+      }
+      return;
+    }
+    // Recarga completa para que el servidor vea la sesión nueva.
+    window.location.assign("/");
   }
 
   return (
@@ -57,54 +49,53 @@ export default function LoginPage() {
           <p className="text-sm text-stone-500">CRM del equipo</p>
         </div>
 
-        {status === "sent" ? (
-          <div className="space-y-3 text-center">
-            <p className="text-4xl">📬</p>
-            <p className="font-semibold">Te mandamos un mail a {email.trim().toLowerCase()}</p>
-            <p className="text-sm text-stone-600">
-              Abrilo <b>desde esta misma compu</b> y tocá el link. Si no lo ves, fijate en Spam o Promociones.
-            </p>
-            <button onClick={() => setStatus("idle")} className="text-sm text-stone-500 underline">
-              Usar otro mail
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={sendLink} className="space-y-3">
+        <form onSubmit={signIn} className="space-y-3" noValidate>
+          <div className="space-y-1">
             <label htmlFor="email" className="block text-sm font-medium text-stone-700">
-              Tu mail
+              Mail
             </label>
             <input
               id="email"
               type="email"
               inputMode="email"
-              autoComplete="email"
+              autoComplete="username"
               autoCapitalize="none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input"
-              placeholder="nombre@gmail.com"
-              aria-invalid={!!error}
+              placeholder="ventas@wayfarerarg.com"
               autoFocus
             />
-            <button type="submit" disabled={status === "sending"} className="btn-primary w-full py-3 text-base">
-              {status === "sending" ? "Mandando…" : "Mandarme el link para entrar"}
-            </button>
-            <p className="text-xs text-stone-500">Sin contraseña: te llega un link al mail y con eso entrás.</p>
-          </form>
-        )}
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="password" className="block text-sm font-medium text-stone-700">
+              Contraseña
+            </label>
+            <div className="relative">
+              <input
+                id="password"
+                type={show ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input pr-16"
+              />
+              <button
+                type="button"
+                onClick={() => setShow((s) => !s)}
+                className="absolute inset-y-0 right-2 my-auto h-8 rounded px-2 text-xs font-semibold text-stone-500 hover:bg-stone-100"
+              >
+                {show ? "Ocultar" : "Ver"}
+              </button>
+            </div>
+          </div>
+          <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-base">
+            {loading ? "Entrando…" : "Entrar"}
+          </button>
+        </form>
 
         {error && <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
-
-        {GOOGLE_ENABLED && status !== "sent" && (
-          <>
-            <div className="flex items-center gap-3 text-xs text-stone-400">
-              <span className="h-px flex-1 bg-stone-200" /> o <span className="h-px flex-1 bg-stone-200" />
-            </div>
-            <button onClick={google} className="btn-secondary w-full py-3 text-base">
-              Entrar con Google
-            </button>
-          </>
-        )}
+        <p className="text-center text-xs text-stone-500">¿No tenés contraseña? Pedísela a Misael.</p>
       </div>
     </main>
   );
