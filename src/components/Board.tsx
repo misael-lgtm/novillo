@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useState, useTransition } from "react";
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   TouchSensor,
   useDraggable,
@@ -11,6 +12,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import { moveOrder } from "@/app/actions";
 import { FINAL_STAGES, STAGES, channelLabel, nextStage, type StageId } from "@/lib/config";
@@ -28,6 +30,7 @@ export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCus
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
   const dndId = useId();
+  const [dragging, setDragging] = useState<string | null>(null);
 
   useEffect(() => setOrders(initialOrders), [initialOrders]);
 
@@ -69,12 +72,15 @@ export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCus
   }
 
   function onDragEnd(e: DragEndEvent) {
+    setDragging(null);
     const order = orders.find((o) => o.id === e.active.id);
     const target = e.over?.id as StageId | undefined;
     if (order && target) requestMove(order, target);
   }
 
   const teamName = (email: string) => team.find((m) => m.email === email)?.name.split(" ")[0] ?? email.split("@")[0];
+
+  const draggedOrder = dragging ? orders.find((o) => o.id === dragging) : undefined;
 
   return (
     <div className="space-y-4">
@@ -96,7 +102,13 @@ export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCus
       </p>
       {error && <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div>}
 
-      <DndContext id={dndId} sensors={sensors} onDragEnd={onDragEnd}>
+      <DndContext
+        id={dndId}
+        sensors={sensors}
+        onDragStart={(e: DragStartEvent) => setDragging(String(e.active.id))}
+        onDragCancel={() => setDragging(null)}
+        onDragEnd={onDragEnd}
+      >
         <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-4">
           {STAGES.map((stage) => {
             const items = visible.filter((o) => o.stage === stage.id);
@@ -116,6 +128,10 @@ export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCus
             );
           })}
         </div>
+        {/* La tarjeta que se arrastra va por encima de todo: las columnas tienen scroll y la recortarían. */}
+        <DragOverlay>
+          {draggedOrder && <CardFace order={draggedOrder} who={teamName(draggedOrder.assigned_to)} className="rotate-2 shadow-lg" />}
+        </DragOverlay>
       </DndContext>
 
       {dialog && (
@@ -154,7 +170,7 @@ function Column({
     <section
       id={id}
       ref={setNodeRef}
-      className={`flex w-72 shrink-0 snap-start flex-col rounded-xl border-2 p-2 transition ${color} ${isOver ? "ring-4 ring-stone-900/20" : ""}`}
+      className={`flex max-h-[calc(100dvh-21rem)] md:max-h-[calc(100dvh-14rem)] min-h-64 w-72 shrink-0 snap-start flex-col rounded-xl border-2 p-2 transition ${color} ${isOver ? "ring-4 ring-stone-900/20" : ""}`}
     >
       <header className="px-2 pb-2 pt-1" title={help}>
         <h2 className="flex items-center justify-between font-bold">
@@ -162,7 +178,8 @@ function Column({
         </h2>
         <p className="text-xs text-stone-500">{help}</p>
       </header>
-      <div className="flex min-h-24 flex-1 flex-col gap-2">{children}</div>
+      {/* Cada columna baja por su cuenta: el tablero no se estira con muchas tarjetas. */}
+      <div className="-mr-1 flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">{children}</div>
     </section>
   );
 }
@@ -183,18 +200,41 @@ function Card({
   nextLabel?: string;
   onNext?: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: order.id });
-  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
-  const stale = Date.now() - Date.parse(order.stage_changed_at) > 3 * 86400000 && !FINAL_STAGES.includes(order.stage);
+  // Mientras se arrastra, la que se mueve es la copia del DragOverlay; esta queda marcada en su lugar.
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: order.id });
 
   return (
-    <article
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className={`touch-manipulation rounded-lg border bg-white p-3 shadow-sm ${isDragging ? "z-50 rotate-2 shadow-lg" : ""} ${stale ? "border-amber-400" : "border-stone-200"}`}
-    >
+    <div ref={setNodeRef} {...listeners} {...attributes} className={`touch-manipulation ${isDragging ? "opacity-40" : ""}`}>
+      <CardFace order={order} who={who}>
+        {onNext && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={onNext}
+            className="mt-2 w-full rounded-md bg-stone-100 py-1.5 text-xs font-semibold hover:bg-stone-200"
+          >
+            Pasar a {nextLabel} →
+          </button>
+        )}
+      </CardFace>
+    </div>
+  );
+}
+
+function CardFace({
+  order,
+  who,
+  className = "",
+  children,
+}: {
+  order: OrderWithCustomer;
+  who: string;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const stale = Date.now() - Date.parse(order.stage_changed_at) > 3 * 86400000 && !FINAL_STAGES.includes(order.stage);
+  return (
+    <article className={`rounded-lg border bg-white p-3 shadow-sm ${stale ? "border-amber-400" : "border-stone-200"} ${className}`}>
       <Link href={`/pedidos/${order.id}`} className="block space-y-1" draggable={false}>
         <div className="flex items-center justify-between text-xs text-stone-500">
           <span className="font-mono">
@@ -213,16 +253,7 @@ function Card({
           </span>
         </div>
       </Link>
-      {onNext && (
-        <button
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onClick={onNext}
-          className="mt-2 w-full rounded-md bg-stone-100 py-1.5 text-xs font-semibold hover:bg-stone-200"
-        >
-          Pasar a {nextLabel} →
-        </button>
-      )}
+      {children}
     </article>
   );
 }
