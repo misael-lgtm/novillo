@@ -29,7 +29,7 @@ Pensado para que sea **imposible cargar mal un pedido**.
 - **Tareas automáticas**: al pasar a una etapa se crea la tarea que corresponde ("Chequear si pagó", "Armar y despachar", "Confirmar que le llegó"…) y se cierran solas las de la etapa anterior.
 - **Alertas**: las tarjetas que llevan más de 3 días sin moverse se marcan en naranja.
 - **Formularios que no pierden lo escrito** cuando hay un error.
-- **Solo entra el equipo**: login con link al mail (sin contraseñas) y lista de mails autorizados.
+- **Solo entra el equipo**: login con mail y contraseña (los usuarios los crea el admin en Supabase) y lista de personas autorizadas.
 
 ## Dónde está online
 
@@ -39,8 +39,8 @@ Cada cambio que entra a `main` se publica solo.
 ## Ponerlo online para el equipo (una sola vez, ~20 min)
 
 Queda en una dirección propia (ej. `wayfarer-crm.vercel.app`). Los vendedores la abren en Chrome
-desde la compu o el celu **sin instalar nada y sin cuenta de Claude**: ponen su mail, les llega un
-link y entran. Supabase y Vercel son gratis para este uso.
+desde la compu o el celu **sin instalar nada y sin cuenta de Claude**: entran con mail y contraseña.
+Supabase y Vercel son gratis para este uso.
 
 ### 1. Supabase (base de datos + login)
 
@@ -57,16 +57,9 @@ link y entran. Supabase y Vercel son gratis para este uso.
    ```
    `email` identifica a la persona; `login_email` es la casilla con la que entra si la comparte con otros.
    Después podés sumar o desactivar gente desde la pantalla **Equipo**.
-5. **Authentication → URL Configuration**: en *Site URL* poné la dirección que te dé Vercel en el paso 2
-   (podés volver a completarlo después) y en *Redirect URLs* agregá esa misma dirección seguida de `/auth/callback`.
+5. **Authentication → Users → Add user → Create new user**: creá un usuario por cada mail con el que se
+   entra (tu mail y la casilla compartida, ej. `ventas@...`), con una contraseña y tildando **Auto Confirm User**.
 6. **Project Settings → API**: copiá *Project URL* y la clave *anon public*. Las usás en el paso 2.
-7. (Recomendado) **Authentication → Email Templates → Magic Link**: cambiá el asunto a
-   `Tu link para entrar al CRM de Wayfarer` y el texto a
-   `<p>Tocá acá para entrar:</p><p><a href="{{ .ConfirmationURL }}">Entrar al CRM</a></p>`.
-
-> **Límite de mails:** el correo que trae Supabase de fábrica manda pocos mails por hora. Alcanza porque
-> cada vendedor entra una vez por compu y queda logueado. Si algún día dice "muchos links seguidos",
-> conectá un correo propio en *Authentication → SMTP Settings* (por ejemplo con Resend, que es gratis).
 
 ### 2. Vercel (la página)
 
@@ -75,29 +68,18 @@ link y entran. Supabase y Vercel son gratis para este uso.
 3. En **Environment Variables** agregá las dos del paso 1.6:
    - `NEXT_PUBLIC_SUPABASE_URL` = el *Project URL*
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = la clave *anon public*
-4. **Deploy**. Al terminar te da la dirección (ej. `https://novillo.vercel.app`). Volvé a Supabase y completá el paso 1.5 con esa dirección.
+4. **Deploy**. Al terminar te da la dirección (ej. `https://novillo.vercel.app`). Esa es la dirección para el equipo.
 
 ### 3. Sumar a los vendedores
 
-1. Entrá vos a la dirección, poné tu mail y tocá el link que te llega.
+1. Entrá vos a la dirección con tu mail y contraseña.
 2. Si no los cargaste en el paso 1.4, andá a **Equipo** y sumalos: con su propio mail, o con
-   "Entra con la casilla compartida".
-3. Pasales la dirección. Ponen su mail (o el de la casilla compartida), abren el link **en la misma compu**,
-   y si la casilla es compartida eligen su nombre. La compu se acuerda; para cambiar de persona, tocan su nombre arriba a la derecha.
+   "Entra con la casilla compartida". Cada mail con el que se entra necesita su usuario en Supabase (paso 1.5).
+3. Pasales la dirección y la contraseña. Si la casilla es compartida, al entrar eligen su nombre.
+   La compu se acuerda; para cambiar de persona, tocan su nombre arriba a la derecha.
    En el celu: *Agregar a pantalla de inicio* y queda como una app.
 
-Si alguien que no está en Equipo pone su mail, entra a una pantalla que dice que no tiene acceso: no ve nada.
-
-### (Opcional) Botón "Entrar con Google"
-
-Activá Google en *Authentication → Providers* ([guía](https://supabase.com/docs/guides/auth/social-login/auth-google))
-y agregá en Vercel la variable `NEXT_PUBLIC_GOOGLE_LOGIN` = `true`.
-
-## Versión de prueba en claude.ai
-
-`app-vendedores/index.html` es una versión liviana publicada como artifact de claude.ai
-(https://claude.ai/artifact/JMTDZe8keySBXgHkY95aJz). Sirve para probar, pero cada persona necesita
-cuenta de Claude. Para el equipo usá la versión de arriba. Los datos de una y otra no se comparten.
+Si alguien entra con un mail que no está en Equipo, ve una pantalla que dice que no tiene acceso: no ve nada.
 
 ## Cambiar etapas, canales, medios de pago o correos
 
