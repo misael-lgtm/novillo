@@ -431,6 +431,7 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
    - Pide confirmación antes de mover.
 6. **Mail obligatorio para contactos nuevos** (Nuevo pedido → "Es un cliente nuevo"): además de IG o celular. Se valida solo en el servidor (`createOrder`, campo `new_email`), **no** en la base: los ~9.500 clientes importados no tienen mail. Si el contacto ya existía y no tenía mail, se le guarda. En la ficha del cliente el mail sigue siendo opcional.
 7. 1/10/2026: los 2 pedidos de "Hablar de nuevo" (#8459, #8584) se pasaron a "Más adelante" por SQL a pedido del usuario, con su tarea "Volver a contactar" para el 31/10 (`created_by` = misael).
+8. 1/10/2026, **duplicados**: se archivaron (no borraron) 134 tarjetas de clientes que tenían más de una. Regla: si el cliente compró, quedan sus compras y se archiva todo lo demás (132 "Sin causa"); si no compró, queda la más avanzada/reciente (2 "Enviar nuevamente" repetidas). También se archivaron sus 2 tareas abiertas. Las compras repetidas (110 clientes con varias compras en fechas distintas) **se dejaron**: son ventas reales. Se ven en gris en la ficha del cliente y en Archivo; se pueden restaurar.
 
 **Historial de PRs:** #2 a #11, todos mergeados a `main`.
 - #2: casilla compartida + "¿Quién sos?".
