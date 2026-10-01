@@ -83,6 +83,9 @@ export function formatMoney(n: number | null): string {
 export type OrderFields = {
   /** "cambio" = cambio de talle/prenda: puede ser sin cargo (sin monto ni pago). */
   kind?: "venta" | "cambio";
+  /** Historial importado de ClickUp: sin datos de pago/envío en la etapa con la que llegó. */
+  source?: string | null;
+  source_stage?: string | null;
   total: number | null;
   payment_method: string | null;
   shipping_address: string | null;
@@ -91,7 +94,7 @@ export type OrderFields = {
   cancel_reason: string | null;
 };
 
-export type RequiredField = Exclude<keyof OrderFields, "kind">;
+export type RequiredField = Exclude<keyof OrderFields, "kind" | "source" | "source_stage">;
 
 export const FIELD_LABELS: Record<RequiredField, string> = {
   total: "Monto total",
@@ -125,6 +128,10 @@ function isFilled(field: RequiredField, v: OrderFields[RequiredField]): boolean 
 /** Qué campos faltan para poder poner el pedido en esa etapa. */
 export function missingForStage(order: OrderFields, stage: StageId): RequiredField[] {
   // Un cambio sin cargo (sin monto) no necesita monto ni medio de pago.
+  // Igual que en la base (0002_clickup_import.sql): exento solo mientras siga en la etapa importada.
+  if (order.source === "clickup" && order.source_stage === stage && (stage === "entregado" || stage === "esperando_pago")) {
+    return [];
+  }
   const freeExchange = order.kind === "cambio" && order.total == null;
   return STAGE_REQUIREMENTS[stage].filter(
     (f) => !(freeExchange && (f === "total" || f === "payment_method")) && !isFilled(f, order[f]),
