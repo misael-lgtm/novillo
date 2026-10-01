@@ -14,16 +14,31 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { moveOrder, moveOrders } from "@/app/actions";
+import { loadMoreOrders, moveOrder, moveOrders } from "@/app/actions";
 import { FINAL_STAGES, STAGES, channelLabel, nextStage, type StageId } from "@/lib/config";
 import { formatMoney, missingForStage, type RequiredField } from "@/lib/rules";
 import type { OrderWithCustomer, TeamMember } from "@/lib/types";
+import { MoveAllDialog } from "./MoveAllDialog";
 import { StageMoveDialog } from "./StageMoveDialog";
 
 type Pending = { order: OrderWithCustomer; target: StageId; missing: RequiredField[] };
 
-export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCustomer[]; team: TeamMember[]; me: string }) {
+export function Board({
+  initialOrders,
+  initialRemaining,
+  team,
+  me,
+}: {
+  initialOrders: OrderWithCustomer[];
+  /** Compró / Sin causa: cuántas quedan en la base sin traer (se piden con "Ver más"). */
+  initialRemaining: Record<string, number>;
+  team: TeamMember[];
+  me: string;
+}) {
   const [orders, setOrders] = useState(initialOrders);
+  const [remaining, setRemaining] = useState(initialRemaining);
+  const [fetched, setFetched] = useState(() => countByStage(initialOrders));
+  const [loadingMore, setLoadingMore] = useState<string | null>(null);
   const [onlyMine, setOnlyMine] = useState(false);
   const [q, setQ] = useState("");
   const [dialog, setDialog] = useState<Pending | null>(null);
@@ -38,8 +53,25 @@ export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCus
   const [bulkReason, setBulkReason] = useState("");
   const [bulkPending, startBulk] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
+  const [moveAll, setMoveAll] = useState<{ stage: StageId; count: number } | null>(null);
 
-  useEffect(() => setOrders(initialOrders), [initialOrders]);
+  useEffect(() => {
+    setOrders(initialOrders);
+    setRemaining(initialRemaining);
+    setFetched(countByStage(initialOrders));
+  }, [initialOrders, initialRemaining]);
+
+  async function loadMore(stage: string) {
+    setLoadingMore(stage);
+    const more = await loadMoreOrders(stage, fetched[stage] ?? 0);
+    setOrders((os) => {
+      const have = new Set(os.map((o) => o.id));
+      return [...os, ...more.filter((o) => !have.has(o.id))];
+    });
+    setFetched((f) => ({ ...f, [stage]: (f[stage] ?? 0) + more.length }));
+    setRemaining((r) => ({ ...r, [stage]: more.length ? Math.max(0, (r[stage] ?? 0) - more.length) : 0 }));
+    setLoadingMore(null);
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -110,7 +142,7 @@ export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCus
     setError(null);
     setNotice(null);
     startBulk(async () => {
-      const r = await moveOrders(ids, target, reason);
+      const r = await moveOrders({ orderIds: ids }, target, reason);
       if (!r.ok) {
         setError(r.error);
         return;
@@ -171,6 +203,10 @@ export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCus
         <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-4">
           {STAGES.map((stage) => {
             const items = visible.filter((o) => o.stage === stage.id);
+            // Compró / Sin causa: las más nuevas arriba (son historial; las otras, las más viejas arriba para atenderlas).
+            if (FINAL_STAGES.includes(stage.id)) items.sort((a, b) => b.stage_changed_at.localeCompare(a.stage_changed_at));
+            const filtering = onlyMine || q.trim() !== "";
+            const left = remaining[stage.id] ?? 0;
             const next = nextStage(stage.id);
             return (
               <Column
@@ -179,11 +215,25 @@ export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCus
                 label={stage.label}
                 help={stage.help}
                 color={stage.color}
-                count={items.length}
+                count={filtering ? items.length : items.length + left}
+                onMoveAll={
+                  !selecting && items.length + left > 0
+                    ? () => {
+                        setNotice(null);
+                        setMoveAll({ stage: stage.id, count: items.length + left });
+                      }
+                    : undefined
+                }
+                more={
+                  left > 0
+                    ? { left, loading: loadingMore === stage.id, onClick: () => loadMore(stage.id) }
+                    : undefined
+                }
                 selectAll={
                   selecting && items.length
                     ? {
                         all: items.every((o) => selected.has(o.id)),
+                        loaded: items.length,
                         onToggle: (on) => toggle(items.map((o) => o.id), on),
                       }
                     : undefined
@@ -255,6 +305,18 @@ export function Board({ initialOrders, team, me }: { initialOrders: OrderWithCus
         </div>
       )}
 
+      {moveAll && (
+        <MoveAllDialog
+          from={moveAll.stage}
+          count={moveAll.count}
+          onClose={() => setMoveAll(null)}
+          onDone={(message) => {
+            setMoveAll(null);
+            setNotice(message);
+          }}
+        />
+      )}
+
       {dialog && (
         <StageMoveDialog
           order={dialog.order}
@@ -278,6 +340,8 @@ function Column({
   color,
   count,
   selectAll,
+  onMoveAll,
+  more,
   children,
 }: {
   id: string;
@@ -285,7 +349,9 @@ function Column({
   help: string;
   color: string;
   count: number;
-  selectAll?: { all: boolean; onToggle: (on: boolean) => void };
+  selectAll?: { all: boolean; loaded: number; onToggle: (on: boolean) => void };
+  more?: { left: number; loading: boolean; onClick: () => void };
+  onMoveAll?: () => void;
   children: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
@@ -297,22 +363,47 @@ function Column({
     >
       <header className="px-2 pb-2 pt-1" title={help}>
         <h2 className="flex items-center justify-between font-bold">
-          {label} <span className="rounded-full bg-white/70 px-2 text-sm">{count}</span>
+          {label} <span className="rounded-full bg-white/70 px-2 text-sm">{count.toLocaleString("es-AR")}</span>
         </h2>
         <p className="text-xs text-stone-500">{help}</p>
+        {onMoveAll && (
+          <button
+            onClick={onMoveAll}
+            className="mt-2 w-full rounded-md bg-white/70 py-1.5 text-xs font-semibold hover:bg-white"
+          >
+            Pasar todas a… →
+          </button>
+        )}
         {selectAll && (
           <button
             onClick={() => selectAll.onToggle(!selectAll.all)}
             className="mt-2 w-full rounded-md bg-white/70 py-1.5 text-xs font-semibold hover:bg-white"
           >
-            {selectAll.all ? "Desmarcar todas" : `Elegir todas (${count})`}
+            {selectAll.all ? "Desmarcar todas" : `Elegir todas (${selectAll.loaded})`}
           </button>
         )}
       </header>
       {/* Cada columna baja por su cuenta: el tablero no se estira con muchas tarjetas. */}
-      <div className="-mr-1 flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">{children}</div>
+      <div className="-mr-1 flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
+        {children}
+        {more && (
+          <button
+            onClick={more.onClick}
+            disabled={more.loading}
+            className="w-full rounded-md bg-white/70 py-2 text-xs font-semibold hover:bg-white disabled:opacity-60"
+          >
+            {more.loading ? "Cargando…" : `Ver más (quedan ${more.left.toLocaleString("es-AR")})`}
+          </button>
+        )}
+      </div>
     </section>
   );
+}
+
+function countByStage(orders: OrderWithCustomer[]) {
+  const c: Record<string, number> = {};
+  for (const o of orders) c[o.stage] = (c[o.stage] ?? 0) + 1;
+  return c;
 }
 
 function daysAgo(iso: string) {

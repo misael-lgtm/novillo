@@ -115,7 +115,7 @@ export const FIRST_STAGE: StageId = "primer_contacto";
 export const SOLD_STAGE: StageId = "compro";
 /** Perdido: pide motivo. */
 export const LOST_STAGE: StageId = "sin_causa";
-/** Etapas finales: en el tablero solo se ven las de los últimos 14 días. */
+/** Etapas finales: tienen miles (historial), así que el tablero las trae de a poco ("Ver más"). */
 export const FINAL_STAGES: readonly StageId[] = [SOLD_STAGE, LOST_STAGE];
 
 /** Etapa sugerida para el botón "Pasar a…". */

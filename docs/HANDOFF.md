@@ -82,7 +82,7 @@ src/
     auth/callback, auth/logout
     actions.ts             server actions (createOrder, moveOrder, createExchange, addMember, …)
     (app)/page.tsx         "Hoy": tareas del día + contadores por etapa (sin las finales)
-    (app)/tablero          Kanban (últimos 14 días para etapas finales)
+    (app)/tablero          Kanban (Compró / Sin causa: de a 50, con "Ver más")
     (app)/pedidos/nuevo, pedidos/[id]
     (app)/clientes, clientes/[id]   ("total comprado" cuenta SOLD_STAGE)
     (app)/tareas, archivo, equipo (admin)
@@ -420,7 +420,7 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
      - la columna scrollea;
      - arrastrar desde abajo de la columna sigue funcionando y queda guardado al recargar;
      - en el celu la columna termina arriba del menú inferior.
-3. En el tablero, las etapas finales (Compró y Sin causa) solo muestran los últimos 14 días. Las ventas viejas se ven en la ficha del cliente.
+3. En el tablero, Compró y Sin causa muestran **todo** (antes eran solo los últimos 14 días; el usuario quiere ver esos contactos). Se traen de a 50 (`FINAL_PAGE` en `src/lib/queries.ts`), los más recientes arriba, con "Ver más (quedan N)" (`loadMoreOrders`). El contador de la columna es el total real. El buscador y "Elegir todas" solo cubren las tarjetas ya cargadas; "Pasar todas a…" cubre la etapa entera.
 
 4. **Modo oscuro** con botón 🌙/☀️ en el menú y en el login (ver §7).
 5. **Mover muchas tarjetas juntas** (tablero → "☑️ Seleccionar"): se tocan tarjetas o "Elegir todas (N)" arriba de cada columna, y abajo aparece una barra "N elegidos · Pasar a… · Mover".
@@ -429,11 +429,12 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
    - Los pedidos a los que les faltan datos para la etapa (monto o medio de pago para Compró/Esperando pago) **no se mueven**; el mensaje dice cuáles quedaron.
    - Para "Sin causa" pide un motivo que se aplica a los que no tienen.
    - Pide confirmación antes de mover.
+   - Además, cada columna tiene **"Pasar todas a… →"** (`MoveAllDialog.tsx`): mueve la etapa entera, incluidas las tarjetas no cargadas (`moveOrders({ fromStage }, …)`, lee de a 1000 y actualiza de a 200 ids).
 6. **Mail obligatorio para contactos nuevos** (Nuevo pedido → "Es un cliente nuevo"): además de IG o celular. Se valida solo en el servidor (`createOrder`, campo `new_email`), **no** en la base: los ~9.500 clientes importados no tienen mail. Si el contacto ya existía y no tenía mail, se le guarda. En la ficha del cliente el mail sigue siendo opcional.
 7. 1/10/2026: los 2 pedidos de "Hablar de nuevo" (#8459, #8584) se pasaron a "Más adelante" por SQL a pedido del usuario, con su tarea "Volver a contactar" para el 31/10 (`created_by` = misael).
 8. 1/10/2026, **duplicados**: se archivaron (no borraron) 134 tarjetas de clientes que tenían más de una. Regla: si el cliente compró, quedan sus compras y se archiva todo lo demás (132 "Sin causa"); si no compró, queda la más avanzada/reciente (2 "Enviar nuevamente" repetidas). También se archivaron sus 2 tareas abiertas. Después, a pedido del usuario, también se archivaron las compras viejas de los 110 clientes que compraron varias veces (125 tarjetas); a cada uno le queda su compra más reciente. Resultado: **una tarjeta activa por cliente** (9.542 clientes = 9.542 tarjetas; Compró 2.083). Se ven en gris en la ficha del cliente y en Archivo; se pueden restaurar.
 
-**Historial de PRs:** #2 a #11, todos mergeados a `main`.
+**Historial de PRs:** #2 a #12, todos mergeados a `main`.
 - #2: casilla compartida + "¿Quién sos?".
 - #3: README con la URL.
 - #4: página de error de configuración.
@@ -444,6 +445,7 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
 - #9: scroll del tablero.
 - #10: modo oscuro + este handoff.
 - #11: seleccionar y mover muchas tarjetas + mail obligatorio.
+- #12: "Pasar todas a…" por columna + Compró/Sin causa completos con "Ver más".
 
 ---
 
