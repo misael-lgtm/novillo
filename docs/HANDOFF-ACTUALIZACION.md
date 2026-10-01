@@ -1,0 +1,198 @@
+# CRM Wayfarer: actualización posterior al HANDOFF (1/10/2026)
+
+Esto va **después** de `docs/HANDOFF.md`, que se pasó cuando estaba mergeado hasta el PR #10 (modo oscuro + handoff). Acá está todo lo que se hizo después: PRs #11 y #12 y cambios directos en la base de producción. `docs/HANDOFF.md` ya está actualizado con esto mismo (§6, puntos 5 a 8, y el historial de PRs). Este archivo es el resumen para no tener que releer todo.
+
+**Estado de producción:**
+- `main` = `76b96a9`, con todo mergeado.
+- Vercel publica solo desde `main`. El PR #12 quedó publicándose ("Vercel is deploying") cuando se cerró la sesión, así que confirmá en el GitHub status de `main` que haya terminado bien.
+
+**Rama de trabajo:** `claude/awesome-gauss-1hybhb`. Siempre se trabajó así: PR a `main`, merge, y Vercel publica.
+
+---
+
+## 1. Cambios en la base de producción (por SQL, a pedido del usuario)
+
+Ninguno de estos cambios tiene una migración en `supabase/migrations/`: son cambios de datos, no de esquema. Todo es reversible porque se archivó, no se borró. En el CRM no se borra nada: hay un trigger `prevent_delete`.
+
+### 1.1 "Hablar de nuevo" → "Más adelante"
+
+El usuario pidió vaciar "Hablar de nuevo".
+
+- Se movieron los 2 pedidos que había: **#8459** (@karinacarr76, Fabricio) y **#8584** (+5492234394707, Misael).
+- Se hizo lo mismo que hace la app al mover:
+  - se cerraron (`done_at`) sus tareas automáticas viejas;
+  - se creó para cada uno la tarea "Volver a contactar (#N)" con vencimiento el 31/10/2026, asignada al vendedor y con `auto_stage='mas_adelante'`.
+- **Ojo:** `tasks.created_by` es NOT NULL y no tiene default útil desde SQL, así que se cargó `created_by='misael@wayfarerarg.com'`.
+- La columna "Hablar de nuevo" **sigue existiendo** en el tablero, vacía. El usuario no pidió sacarla.
+
+### 1.2 Limpieza de duplicados: una tarjeta activa por cliente
+
+El usuario pidió "borrá duplicados y dejá siempre la mejor tarjeta; la mejor es la que ya compró", y después "sí, una sola".
+
+**Antes:** 224 clientes tenían más de un pedido activo, con 259 tarjetas de más. No había clientes duplicados: IG y celular tienen índice único, así que los duplicados eran **pedidos** del mismo cliente.
+
+**Paso 1** (134 archivadas, `archived_at = now()`):
+- Si el cliente tenía alguna compra (`compro`), se archivó todo lo que no era compra: 132 tarjetas de "Sin causa".
+- Si no tenía compras, quedó la más avanzada y reciente: 2 clientes con dos "Enviar nuevamente" cada uno, y se archivó la más vieja.
+- Orden usado para elegir: `(stage='compro') desc, (stage<>'sin_causa') desc, stage_changed_at desc, number desc`.
+- Se archivaron también sus 2 tareas abiertas (`tasks.archived_at`).
+
+**Paso 2** (125 archivadas):
+- De los 110 clientes que compraron varias veces (en fechas distintas, o sea ventas reales), quedó **solo la compra más reciente** y se archivaron las 125 compras viejas.
+- No tenían tareas abiertas.
+
+**Resultado** (verificado): **9.542 clientes = 9.542 tarjetas activas**, ningún cliente con más de una.
+
+| Etapa | Tarjetas activas |
+|---|---|
+| Compró | 2.083 |
+| Sin causa | 7.415 |
+| Enviar nuevamente | 21 |
+| Interesado | 16 |
+| Más adelante | 3 |
+| Promo del finde | 2 |
+| Avanzado | 1 |
+| Esperando pago | 1 |
+
+**Consecuencias:**
+- Si se cuentan ventas con `stage='compro' and archived_at is null`, da 2.083 y no 2.208. Para contar todas las ventas históricas, **no** hay que filtrar por `archived_at`.
+- Lo archivado se ve en gris en la ficha del cliente (`clientes/[id]` muestra los archivados con `opacity-50` y la etiqueta "Archivado") y en `/archivo` (últimos 100).
+- **Para revertir:** filtrar por `archived_at` de 1/10/2026 alrededor de las 19:3x UTC y poner `archived_at = null`. Ojo, que pueden haberse archivado otras cosas a mano después.
+
+> El usuario **no** quiere tarjetas de más por cliente. Si se agrega algo que crea pedidos en lote (por ejemplo, otra importación), hay que mantener "una tarjeta activa por cliente".
+
+---
+
+## 2. PR #11: seleccionar y mover muchas tarjetas + mail obligatorio
+
+### 2.1 Modo selección en el tablero (`src/components/Board.tsx`)
+
+- **Botón "☑️ Seleccionar":** está en la barra de arriba, al lado del buscador. Cuando está activo dice "Listo".
+- **Mientras se selecciona:**
+  - Las tarjetas se renderizan con `SelectCard`: un `<button role="checkbox">` que envuelve a `CardFace` con `asLink={false}`, así tocarla la elige y no abre el pedido.
+  - En ese modo no hay arrastrar y soltar.
+  - Cada columna tiene "Elegir todas (N)" / "Desmarcar todas". N es la cantidad de tarjetas **cargadas** de esa columna.
+- **Barra fija abajo:** clase `card fixed inset-x-4 bottom-20 md:bottom-4 z-40`. En el celu queda arriba de la barra de navegación.
+  - Contenido: "N elegidos", un `<select aria-label="Pasar a">` y los botones "Mover" y "Desmarcar".
+  - Si la etapa elegida es "Sin causa", aparece un input "Motivo (para los que no tienen)".
+- **Al mover:**
+  - Pide `confirm()`.
+  - Llama a `moveOrders({ orderIds }, etapa, motivo)`.
+  - Actualiza el estado local con los ids que devolvió el servidor y muestra el mensaje en un banner verde (`notice`).
+- `CardFace` ahora acepta `asLink` (por defecto `true`) y usa el helper `Wrap`, que es un `Link` o un `div`.
+
+### 2.2 Server action `moveOrders` (`src/app/actions.ts`)
+
+Firma final, después del PR #12:
+
+```ts
+moveOrders(from: { orderIds: string[] } | { fromStage: string }, stage: string, cancelReason?: string)
+  : Promise<ActionResult<{ moved: string[] }>>
+```
+
+- **Si recibe `orderIds`:** lee esos pedidos de a 200 (`chunks()`), solo los no archivados y que no estén ya en la etapa destino.
+- **Si recibe `fromStage`:** lee **toda** la etapa, paginando de a 1000 (el máximo de filas de la API de Supabase), ordenando por `id`.
+- **Para cada pedido aplica `missingForStage`**, la misma regla que al mover de a uno:
+  - El que no cumple **no se mueve** y queda en `skipped`. El mensaje lista hasta 10 números: "N no se movieron porque les faltan datos (#…)".
+  - Para `sin_causa`, a los pedidos sin `cancel_reason` se les pone el motivo enviado. Si no se manda motivo, esos quedan sin mover.
+- **Updates:** de a 200 ids.
+- **Tareas:** `createFollowUps(moved, target)`, en lote y de a 200. Cierra las tareas automáticas abiertas de esos pedidos y crea la de seguimiento de la etapa (`STAGES[].followUp`).
+- **Mensaje cuando no se mueve ninguno:** "No se movió ninguno a X".
+- `createFollowUp` (singular) ahora llama a `createFollowUps`.
+- Nuevo helper `chunks(xs, size=200)`.
+
+### 2.3 Mail obligatorio para contactos nuevos
+
+- **Formulario** (`src/components/NewOrderForm.tsx`, en la sección "Es un cliente nuevo"): nuevo campo **Mail** (`name="new_email"`, `type="email"`, obligatorio). El texto de ayuda dice "Mail siempre, y además Instagram o celular."
+- **Servidor** (`createOrder` en `actions.ts`):
+  - Si el cliente es nuevo y falta el mail, devuelve "Poné el mail"; si está mal escrito, "Mail inválido. Ej: juana@gmail.com".
+  - Lo guarda en minúsculas.
+  - La regex se movió a la constante `EMAIL_RE`, que también usa `updateCustomer`.
+- `CustomerInput` tiene `email?`. `findOrCreateCustomer` hace dos cosas:
+  - lo inserta junto con el cliente nuevo;
+  - si el cliente ya existía (por IG o celular) y **no tenía mail**, se lo completa (`.is("email", null)`).
+- **No** es obligatorio en la base: no hay CHECK, porque los ~9.500 clientes importados de ClickUp no tienen mail.
+- En la ficha del cliente (`CustomerEditForm`) el mail sigue siendo **opcional**.
+- El usuario fue avisado de que a muchos clientes de IG les puede faltar el mail. Si pide que sea opcional, alcanza con sacar la validación en `createOrder` y el `required` del campo.
+
+---
+
+## 3. PR #12: "Pasar todas a…" por columna + Compró/Sin causa completos
+
+### 3.1 Compró y Sin causa muestran todo (antes, solo los últimos 14 días)
+
+El usuario quiere ver todos esos contactos en el tablero.
+
+- **`src/app/(app)/tablero/page.tsx`** hace tres consultas en paralelo:
+  - Etapas abiertas: todas las no archivadas, `limit 500`, ordenadas por `stage_changed_at` ascendente.
+  - Por cada etapa final (`FINAL_STAGES = compro, sin_causa`): las primeras `FINAL_PAGE` (50) por `stage_changed_at` **descendente**, con `count: "exact"`.
+  - Le pasa al `Board` `initialRemaining = { compro: total-50, sin_causa: total-50 }`.
+- **`src/lib/queries.ts`:** `export const FINAL_PAGE = 50`.
+- **Nueva server action `loadMoreOrders(stage, offset)`:** trae la siguiente página de 50.
+- **Board:**
+  - Lleva el estado `remaining` y `fetched` por etapa (`countByStage`).
+  - Al final de la columna muestra el botón "Ver más (quedan N)". Al agregar tarjetas descarta las repetidas por id.
+  - El contador de la columna es `items.length + remaining` (el total real, con formato es-AR, por ejemplo "7.415"). Si hay filtro ("Solo los míos" o búsqueda), muestra solo `items.length`.
+  - En las etapas finales las tarjetas se ordenan de más nueva a más vieja; en las abiertas, de más vieja a más nueva, para atender primero las que esperan hace más.
+- **Limitaciones conocidas:**
+  - El buscador del tablero y "Elegir todas" solo cubren las tarjetas **cargadas**. Para buscar un contacto puntual: Clientes.
+  - Mover una tarjeta de a una llama a `refresh()` (revalidatePath), que recarga el tablero y pierde las páginas extra que se cargaron con "Ver más".
+
+### 3.2 "Pasar todas a… →" en cada columna
+
+- **Botón** arriba de cada columna, fuera del modo selección, solo si la columna tiene tarjetas.
+- **Abre `src/components/MoveAllDialog.tsx`** (usa `Modal` de `./ui`):
+  - "Vas a mover las N tarjetas de X. ¿A qué etapa?" con un `<select aria-label="Etapa nueva">` sin la etapa de origen.
+  - Si el destino es Sin causa, pide motivo (`required`).
+  - Si el destino es Compró o Esperando pago, avisa que las que no tengan monto (o medio de pago) se quedan donde están.
+  - El botón dice "Mover N".
+- Llama a `moveOrders({ fromStage }, destino, motivo)`, que mueve la **etapa entera, incluidas las tarjetas que no están cargadas**, y después `router.refresh()`.
+- N es el total real de la columna (cargadas + `remaining`).
+
+---
+
+## 4. Cómo se probó (sesión anterior)
+
+- `npx tsc --noEmit` y `npx vitest run` (54 tests) OK.
+- **Playwright contra la base local** (ver `HANDOFF.md` §8 para levantarla).
+  - Arranque de la base local: postgres en `/var/tmp/crmpg` (puerto 5439) se inicia con `su postgres -s /bin/bash -c "/usr/lib/postgresql/16/bin/pg_ctl -D /var/tmp/crmpg/data -l /var/tmp/crmpg/log -o '-k /var/tmp/crmpg -p 5439' start"`. Después `bash /var/tmp/e2e/reset.sh`, `node /var/tmp/e2e/gateway.mjs &` y `next dev`.
+  - Los scripts de `/var/tmp/e2e/` son del contenedor efímero y **no están en el repo**.
+  - En la base local tampoco se puede `delete`: para empezar de cero se usa `reset.sh`.
+- **Casos verificados:**
+  - Elegir todas (4) → Más adelante; tareas creadas.
+  - Compró con 2 de 4 sin monto: se movieron 2 y el mensaje avisó de las otras 2.
+  - Sin causa con motivo.
+  - Elegir de a una y "Listo".
+  - Mail: sin mail no crea el contacto; con mail lo guarda en minúsculas.
+  - Celu (390px).
+  - Con 1.300 pedidos:
+    - Sin causa trae 50, el contador muestra "1.199" y "Ver más" trae 50 más;
+    - "Pasar todas" con las 101 de Interesado;
+    - "Pasar todas" con las 1.199 de Sin causa, cuando solo había 100 cargadas;
+    - Compró sin monto: no movió ninguna.
+- **Trampas de los tests:**
+  - `getByLabel("Pasar a")` choca con el botón del tema ("Pasar a modo oscuro"): usar `{ exact: true }`.
+  - `[name=description]` choca con `<meta name="description">`: usar `textarea#description`.
+  - Crear un pedido **no redirige**: se queda en `/pedidos/nuevo` y muestra un mensaje.
+
+---
+
+## 5. Pendientes y preguntas abiertas
+
+- **Sin respuesta del usuario:** ¿cambiar también en **ClickUp** el nombre del estado "cerrado" por "Compró"? (En el CRM ya se llama Compró.)
+- **Confirmar** que la publicación del PR #12 en Vercel terminó bien. No se pudo ver desde el contenedor: el proxy bloquea vercel.app.
+- **Opcionales que ya estaban en el HANDOFF:**
+  - las 92 ventas de ClickUp que se saltearon por no tener contacto;
+  - borrar `public.clickup_import` y el schema `imp`;
+  - actualizar el README (todavía describe las 5 etapas viejas);
+  - el artifact viejo `app-vendedores`.
+- **Posibles mejoras** (no pedidas):
+  - sacar la columna vacía "Hablar de nuevo" si el usuario ya no la usa;
+  - una búsqueda en el servidor para las columnas finales.
+
+## 6. Recordatorios para trabajar con el usuario (Misael)
+
+- Responder siempre en **castellano rioplatense**, corto y concreto. El usuario no es programador.
+- Pide cosas cortas y a veces ambiguas ("seleccionar toda la lista", "sigo sin verlo"). Una captura suele aclarar más que preguntar.
+- Antes de cambios grandes en datos de producción, mostrar los números ("son 134, ninguna compra") y hacerlo de forma reversible: archivar, nunca borrar.
+- No guardar la contraseña de la base que haya pegado el usuario. No poner la anon key en el código.
