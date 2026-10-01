@@ -3,8 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/auth"];
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+import { SUPABASE_ANON_KEY as SUPABASE_KEY, SUPABASE_URL, looksLikeKey } from "@/lib/supabase/env";
 
 // Página de error clara cuando falta configurar algo (en vez del 500 genérico de Vercel).
 function setupError(detail: string) {
@@ -27,6 +26,11 @@ export async function middleware(request: NextRequest) {
   if (!/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(SUPABASE_URL) && !SUPABASE_URL.startsWith("http://localhost")) {
     return setupError(
       `La variable <b>NEXT_PUBLIC_SUPABASE_URL</b> tiene que ser solo la dirección del proyecto, tipo <code>https://abcd.supabase.co</code> (sin <code>/rest/v1</code> ni espacios).`,
+    );
+  }
+  if (!looksLikeKey(SUPABASE_KEY)) {
+    return setupError(
+      `La variable <b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b> no parece una clave de Supabase. Volvé a copiarla de Supabase (Project Settings → API Keys → <i>anon public</i>) y pegala sola, sin texto alrededor.`,
     );
   }
 
