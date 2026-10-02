@@ -233,10 +233,9 @@ export async function createOrder(_prev: unknown, fd: FormData): Promise<ActionR
   if (!customerId) {
     const v = validateCustomer(fd, "new_");
     Object.assign(fields, v.fields);
-    // Para los contactos nuevos el mail es obligatorio.
+    // El mail se pide pero es opcional; si lo ponen, tiene que estar bien escrito.
     const email = str(fd, "new_email")?.toLowerCase() ?? null;
-    if (!email) fields.new_email = "Poné el mail";
-    else if (!EMAIL_RE.test(email)) fields.new_email = "Mail inválido. Ej: juana@gmail.com";
+    if (email && !EMAIL_RE.test(email)) fields.new_email = "Mail inválido. Ej: juana@gmail.com";
     customerInput = { ...v.input, email };
   }
 

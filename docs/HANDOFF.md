@@ -430,11 +430,11 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
    - Para "Sin causa" pide un motivo que se aplica a los que no tienen.
    - Pide confirmación antes de mover.
    - Además, cada columna tiene **"Pasar todas a… →"** (`MoveAllDialog.tsx`): mueve la etapa entera, incluidas las tarjetas no cargadas (`moveOrders({ fromStage }, …)`, lee de a 1000 y actualiza de a 200 ids).
-6. **Mail obligatorio para contactos nuevos** (Nuevo pedido → "Es un cliente nuevo"): además de IG o celular. Se valida solo en el servidor (`createOrder`, campo `new_email`), **no** en la base: los ~9.500 clientes importados no tienen mail. Si el contacto ya existía y no tenía mail, se le guarda. En la ficha del cliente el mail sigue siendo opcional.
+6. **Mail en contactos nuevos** (Nuevo pedido → "Es un cliente nuevo"): se pide pero es **opcional** (primero fue obligatorio; el 2/10 el usuario pidió que no lo sea). Si lo ponen, se valida el formato y se guarda en minúsculas (`createOrder`, campo `new_email`). Si el contacto ya existía y no tenía mail, se le guarda.
 7. 1/10/2026: los 2 pedidos de "Hablar de nuevo" (#8459, #8584) se pasaron a "Más adelante" por SQL a pedido del usuario, con su tarea "Volver a contactar" para el 31/10 (`created_by` = misael).
 8. 1/10/2026, **duplicados**: se archivaron (no borraron) 134 tarjetas de clientes que tenían más de una. Regla: si el cliente compró, quedan sus compras y se archiva todo lo demás (132 "Sin causa"); si no compró, queda la más avanzada/reciente (2 "Enviar nuevamente" repetidas). También se archivaron sus 2 tareas abiertas. Después, a pedido del usuario, también se archivaron las compras viejas de los 110 clientes que compraron varias veces (125 tarjetas); a cada uno le queda su compra más reciente. Resultado: **una tarjeta activa por cliente** (9.542 clientes = 9.542 tarjetas; Compró 2.083). Se ven en gris en la ficha del cliente y en Archivo; se pueden restaurar.
 
-**Historial de PRs:** #2 a #12, todos mergeados a `main`.
+**Historial de PRs:** #2 a #13, todos mergeados a `main`.
 - #2: casilla compartida + "¿Quién sos?".
 - #3: README con la URL.
 - #4: página de error de configuración.
@@ -444,8 +444,9 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
 - #8: etapas de ClickUp.
 - #9: scroll del tablero.
 - #10: modo oscuro + este handoff.
-- #11: seleccionar y mover muchas tarjetas + mail obligatorio.
+- #11: seleccionar y mover muchas tarjetas + mail en contactos nuevos.
 - #12: "Pasar todas a…" por columna + Compró/Sin causa completos con "Ver más".
+- #13: el mail de contacto nuevo pasa a ser opcional.
 
 ---
 
