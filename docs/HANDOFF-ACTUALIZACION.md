@@ -101,7 +101,9 @@ moveOrders(from: { orderIds: string[] } | { fromStage: string }, stage: string, 
 - `createFollowUp` (singular) ahora llama a `createFollowUps`.
 - Nuevo helper `chunks(xs, size=200)`.
 
-### 2.3 Mail obligatorio para contactos nuevos
+### 2.3 Mail para contactos nuevos (después pasó a opcional, PR #13)
+
+> **Actualización 2/10:** el usuario pidió que se pida pero **no sea obligatorio**. Ya no existe el error "Poné el mail" y el campo no tiene `required`; solo se valida el formato si lo ponen. Lo que sigue describe la versión original.
 
 - **Formulario** (`src/components/NewOrderForm.tsx`, en la sección "Es un cliente nuevo"): nuevo campo **Mail** (`name="new_email"`, `type="email"`, obligatorio). El texto de ayuda dice "Mail siempre, y además Instagram o celular."
 - **Servidor** (`createOrder` en `actions.ts`):
