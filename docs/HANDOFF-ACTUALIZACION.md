@@ -391,3 +391,17 @@ El usuario quiere ver todos esos contactos en el tablero.
   - En modo oscuro esas clases se invierten solas a los 950, que son tonos oscuros.
 - Si el mes no tiene objetivo, el fondo queda como siempre.
 - Se usa el ritmo del equipo, no el de cada vendedor. Si se pide que cada uno vea el suyo, alcanza con usar `minePace ?? teamPace`.
+
+
+## 16. PR #25 (5/10): acumulado a la fecha
+
+- **Pedido del usuario:** "el acumulado diario: cuánto deberíamos venir y cuánto vamos", también abajo de cada vendedor.
+- **Cálculo:** `pace()` ahora también devuelve:
+  - `expected` = objetivo / días del mes × día de hoy (hoy incluido);
+  - `diff` = vendido − expected;
+  - `day`.
+  - Hay un test nuevo; vitest corre 60.
+- **Barra:** el componente `Accumulated` muestra:
+  - en el equipo: "Acumulado al día N: deberíamos llevar $X · llevamos $Y (+/−$Z)", en una segunda línea dentro del `summary`;
+  - en cada vendedor: "debería llevar / lleva", debajo de "$/día · necesita $/día".
+  - La diferencia sale en verde si es positiva y en rojo si es negativa.

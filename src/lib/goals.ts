@@ -111,7 +111,20 @@ export type PaceStatus = "ok" | "warn" | "bad";
  * Necesario por día = objetivo / días del mes. Promedio = vendido / días que pasaron (hoy incluido).
  * Verde: igual o arriba. Amarillo: hasta 20% abajo. Rojo: más de 20% abajo.
  */
-export function pace(line: GoalLine, today: string): { status: PaceStatus; perDay: number; needPerDay: number; ratio: number } | null {
+export function pace(
+  line: GoalLine,
+  today: string,
+): {
+  status: PaceStatus;
+  perDay: number;
+  needPerDay: number;
+  ratio: number;
+  /** Acumulado: cuánto deberían llevar hasta hoy (incluido) para ir al ritmo del objetivo. */
+  expected: number;
+  /** Lo que llevan menos lo que deberían llevar (negativo = abajo). */
+  diff: number;
+  day: number;
+} | null {
   if (!line.goal) return null;
   const [y, m, d] = today.split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -119,5 +132,6 @@ export function pace(line: GoalLine, today: string): { status: PaceStatus; perDa
   const perDay = line.total / d;
   const ratio = perDay / needPerDay;
   const status: PaceStatus = ratio >= 1 ? "ok" : ratio >= 0.8 ? "warn" : "bad";
-  return { status, perDay, needPerDay, ratio };
+  const expected = needPerDay * d;
+  return { status, perDay, needPerDay, ratio, expected, diff: line.total - expected, day: d };
 }
