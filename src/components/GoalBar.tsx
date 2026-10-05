@@ -105,8 +105,8 @@ export async function GoalBar() {
 
 const PACE: Record<PaceStatus, { bar: string; chip: string; dot: string; label: string; page: string }> = {
   ok: { bar: "bg-emerald-500", chip: "bg-emerald-100 text-emerald-900", dot: "🟢", label: "Al día", page: "bg-emerald-50" },
-  warn: { bar: "bg-amber-400", chip: "bg-amber-100 text-amber-900", dot: "🟡", label: "Un poco abajo", page: "bg-amber-50" },
-  bad: { bar: "bg-rose-500", chip: "bg-rose-100 text-rose-900", dot: "🔴", label: "Abajo", page: "bg-rose-50" },
+  warn: { bar: "bg-amber-400", chip: "bg-amber-200 text-amber-900", dot: "🟡", label: "Un poco abajo", page: "bg-amber-100" },
+  bad: { bar: "bg-rose-500", chip: "bg-rose-200 text-rose-900", dot: "🔴", label: "Abajo", page: "bg-rose-100" },
 };
 
 /** Cómo vienen por día contra lo necesario por día. */
