@@ -184,6 +184,52 @@ export async function storeSalesForMonth(month: string): Promise<StoreSales | nu
   return { ok: true, off, byOrigin, checks, read };
 }
 
+export type TnCustomer = {
+  id: number;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  totalSpent: number | null;
+};
+
+type TnCustomerRaw = {
+  id: number;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  total_spent?: string | null;
+  billing_phone?: string | null;
+  billing_city?: string | null;
+  billing_province?: string | null;
+  default_address?: { phone?: string | null; city?: string | null; province?: string | null } | null;
+};
+
+/** Una página (hasta 200) de clientes de la tienda. `done` cuando no hay más. */
+export async function fetchCustomersPage(page: number): Promise<{ ok: true; customers: TnCustomer[]; done: boolean } | { ok: false; error: string }> {
+  if (!isConnected()) return { ok: false, error: "La tienda no está conectada." };
+  try {
+    const url = new URL(`${API}/${tiendanube.storeId}/customers`);
+    url.search = new URLSearchParams({ per_page: "200", page: String(page) }).toString();
+    const res = await fetch(url, { headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA }, cache: "no-store" });
+    if (res.status === 404) return { ok: true, customers: [], done: true };
+    if (res.status === 401 || res.status === 403) return { ok: false, error: "Tiendanube rechazó el token" };
+    if (!res.ok) return { ok: false, error: `Tiendanube respondió ${res.status}` };
+    const raw = (await res.json()) as TnCustomerRaw[];
+    const customers = raw.map((c) => ({
+      id: c.id,
+      name: c.name?.trim() || null,
+      email: c.email?.trim().toLowerCase() || null,
+      phone: c.phone || c.billing_phone || c.default_address?.phone || null,
+      city: c.default_address?.city || c.billing_city || c.default_address?.province || c.billing_province || null,
+      totalSpent: c.total_spent != null && c.total_spent !== "" ? Number(c.total_spent) : null,
+    }));
+    return { ok: true, customers, done: raw.length < 200 };
+  } catch {
+    return { ok: false, error: "No se pudo conectar con Tiendanube" };
+  }
+}
+
 /** Paso final de la autorización: cambia el "code" por el token de la tienda. */
 export async function exchangeCode(code: string): Promise<{ ok: true; token: string; storeId: string } | { ok: false; error: string }> {
   if (!tiendanube.appId || !tiendanube.clientSecret) return { ok: false, error: "Faltan TIENDANUBE_APP_ID y TIENDANUBE_CLIENT_SECRET en Vercel." };

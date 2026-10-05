@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { TnCustomerImport } from "@/components/TnCustomerImport";
 import { attributeStoreSales, monthLabel, monthStart } from "@/lib/goals";
 import { formatDate, formatMoney } from "@/lib/rules";
 import { getTeam, memberName, requireMember } from "@/lib/session";
@@ -163,6 +164,7 @@ export default async function TiendanubePage({ searchParams }: { searchParams: P
           <li>Tiendanube te devuelve a esta página con dos datos para cargar en Vercel. Los cargás, Redeploy, y listo.</li>
         </ol>
       )}
+      {sales?.ok && <TnCustomerImport />}
       <Link href="/equipo#objetivos" className="text-sm underline">
         ← Volver a objetivos
       </Link>
