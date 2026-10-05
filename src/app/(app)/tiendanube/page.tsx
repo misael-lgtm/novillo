@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { monthLabel, monthStart } from "@/lib/goals";
-import { formatMoney } from "@/lib/rules";
-import { requireMember } from "@/lib/session";
-import { OFF_ORIGINS, ORIGIN_LABELS, exchangeCode, isConnected, storeSalesForMonth, tiendanube } from "@/lib/tiendanube";
+import { attributeStoreSales, monthLabel, monthStart } from "@/lib/goals";
+import { formatDate, formatMoney } from "@/lib/rules";
+import { getTeam, memberName, requireMember } from "@/lib/session";
+import { ORIGIN_LABELS, exchangeCode, isConnected, storeSalesForMonth, tiendanube } from "@/lib/tiendanube";
 
 const REDIRECT = "https://wayfarer-crm.vercel.app/tiendanube";
 
 /** Conectar la tienda online (Tiendanube) para que sus ventas sumen al objetivo. Solo admin. */
 export default async function TiendanubePage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
-  const { me } = await requireMember();
+  const { supabase, me } = await requireMember();
   if (!me.is_admin) redirect("/");
   const { code } = await searchParams;
 
@@ -44,6 +44,8 @@ export default async function TiendanubePage({ searchParams }: { searchParams: P
 
   const month = monthStart();
   const sales = isConnected() ? await storeSalesForMonth(month) : null;
+  const team = await getTeam();
+  const sellerOf = sales?.ok ? (await attributeStoreSales(supabase, team, sales.off)).sellerOf : new Map<number, string | null>();
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -62,9 +64,7 @@ export default async function TiendanubePage({ searchParams }: { searchParams: P
             <div className="space-y-3">
               <p>
                 ✔ <b>Conectada.</b> Ventas off de {monthLabel(month)} que cuentan para los objetivos:{" "}
-                <b>{formatMoney(sales.off.reduce((s, x) => s + x.total, 0))}</b> ({sales.off.length} {sales.off.length === 1 ? "pedido" : "pedidos"}
-                {", "}
-                {sales.off.filter((x) => x.offName).length} con “OFF/Nombre”).
+                <b>{formatMoney(sales.off.reduce((s, x) => s + x.total, 0))}</b> ({sales.off.length} {sales.off.length === 1 ? "pedido" : "pedidos"}).
               </p>
               <p className="text-xs font-semibold text-stone-500">Todos los pedidos pagados del mes, según de dónde vienen:</p>
               <ul className="divide-y divide-stone-100 text-sm">
@@ -82,10 +82,49 @@ export default async function TiendanubePage({ searchParams }: { searchParams: P
                   ))}
                 {Object.keys(sales.byOrigin).length === 0 && <li className="py-2 text-stone-500">Todavía no hay pedidos pagados este mes.</li>}
               </ul>
+              <details className="rounded-lg border border-stone-200" open={sales.checks.some((c) => !c.counted)}>
+                <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">
+                  Revisar pedido por pedido ({sales.checks.length} con “off/” o manuales
+                  {sales.checks.some((c) => !c.counted) && `, ${sales.checks.filter((c) => !c.counted).length} no cuentan`})
+                </summary>
+                <div className="max-h-96 overflow-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 bg-stone-50 text-stone-500">
+                      <tr>
+                        <th className="px-3 py-1.5">Pedido</th>
+                        <th className="px-3 py-1.5">Fecha</th>
+                        <th className="px-3 py-1.5">Marca</th>
+                        <th className="px-3 py-1.5 text-right">Monto</th>
+                        <th className="px-3 py-1.5">¿Cuenta?</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {sales.checks.slice(0, 200).map((c) => {
+                        const seller = sellerOf.get(c.id);
+                        return (
+                          <tr key={c.id} className={c.counted ? "" : "bg-rose-50"}>
+                            <td className="px-3 py-1.5 font-mono">#{c.number ?? c.id}</td>
+                            <td className="px-3 py-1.5">{c.date ? formatDate(c.date) : "—"}</td>
+                            <td className="px-3 py-1.5">{c.offName ? `off/${c.offName}` : <span className="text-stone-500">sin marca ({c.origin})</span>}</td>
+                            <td className="px-3 py-1.5 text-right">{formatMoney(c.total)}</td>
+                            <td className="px-3 py-1.5">
+                              {c.counted ? (
+                                <>✔ {seller ? memberName(team, seller) : <span className="text-amber-700">sin asignar (“{c.offName}” no es del equipo)</span>}</>
+                              ) : (
+                                <span className="text-rose-700">✗ {c.reason}</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
               <p className="text-xs text-stone-500">
-                Cuenta como venta off todo pedido marcado <b>“OFF/Nombre”</b> (en la nota o en el nombre del cliente) y los pedidos manuales
-                ({OFF_ORIGINS.join(", ")}). Va al vendedor de “OFF/Nombre”; si no tiene, al de la tarjeta del cliente (mismo celular o mail); si no,
-                queda sin asignar y suma solo al equipo.
+                Se leyeron {sales.read} pedidos de Tiendanube actualizados este mes. Cuenta como venta off solo el pedido pagado que tenga{" "}
+                <b>“off/Nombre”</b> en las notas (ej. “off/fabricio/wsp / comp ICBC”), por fecha de pago. Va al vendedor de ese nombre; si el nombre no es de
+                nadie del equipo, queda sin asignar y suma solo al equipo. Los pedidos manuales sin marca aparecen en la lista pero no cuentan.
               </p>
             </div>
           ) : (

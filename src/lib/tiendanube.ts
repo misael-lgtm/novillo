@@ -32,13 +32,29 @@ export type TnSale = {
 /** Así marcan los chicos sus ventas en Tiendanube: "OFF/Mariano", "OFF / Fabricio", "off-Bruno"… */
 const OFF_MARK = /\bOFF\s*[\/|\-]\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)/i;
 
+/** Fila para revisar en /tiendanube: cada pedido off (o casi) y si cuenta o por qué no. */
+export type TnCheck = {
+  id: number;
+  number: number | null;
+  total: number;
+  origin: string;
+  date: string;
+  offName: string | null;
+  counted: boolean;
+  reason: string | null;
+};
+
 export type StoreSales =
   | {
       ok: true;
-      /** Solo las ventas off (pedidos manuales): son las que cuentan para los objetivos. */
+      /** Solo las ventas off que cuentan para los objetivos. */
       off: TnSale[];
       /** Todos los pedidos pagados del mes por origen, para revisar qué se cuenta y qué no. */
       byOrigin: Record<string, { total: number; ventas: number }>;
+      /** Pedidos con "OFF/" o de origen manual (cuenten o no), para revisar. */
+      checks: TnCheck[];
+      /** Cuántos pedidos se leyeron de Tiendanube en total. */
+      read: number;
     }
   | { ok: false; error: string };
 
@@ -64,36 +80,51 @@ type TnOrder = {
   status: string;
   payment_status: string;
   storefront?: string | null;
-  owner_note?: string | null;
-  note?: string | null;
+  created_at?: string | null;
+  paid_at?: string | null;
   contact_phone?: string | null;
   contact_email?: string | null;
-  contact_name?: string | null;
-  billing_name?: string | null;
-  customer?: { name?: string | null; phone?: string | null; email?: string | null } | null;
+  customer?: { phone?: string | null; email?: string | null } | null;
+  [k: string]: unknown;
 };
 
-/** Pedidos pagados en la tienda en el mes (hora argentina, UTC-3), sin los cancelados. null si no está conectada. */
+/** Las notas del pedido (la del vendedor y la del cliente): ahí los chicos escriben "off/Fabricio/wsp / comp ICBC". */
+function noteText(o: TnOrder): string {
+  return [o.owner_note, o.note].filter((x): x is string => typeof x === "string" && !!x.trim()).join(" · ");
+}
+
+const PAYMENT_LABELS: Record<string, string> = {
+  pending: "pago pendiente",
+  authorized: "pago autorizado, sin acreditar",
+  abandoned: "abandonado",
+  refunded: "devuelto",
+  voided: "anulado",
+};
+
+/**
+ * Ventas de la tienda del mes (hora argentina, UTC-3). Se toman por fecha de pago (o de creación si no tiene).
+ * Pide los pedidos actualizados desde el día 1, así entran los creados antes pero cobrados este mes.
+ * null si no está conectada.
+ */
 export async function storeSalesForMonth(month: string): Promise<StoreSales | null> {
   if (!isConnected()) return null;
   const [y, m] = month.split("-").map(Number);
   const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
-  const min = `${month}T00:00:00-03:00`;
-  const max = new Date(new Date(`${next}T00:00:00-03:00`).getTime() - 1000).toISOString();
+  const from = new Date(`${month}T00:00:00-03:00`).getTime();
+  const to = new Date(`${next}T00:00:00-03:00`).getTime();
 
   const off: TnSale[] = [];
+  const checks: TnCheck[] = [];
   const byOrigin: Record<string, { total: number; ventas: number }> = {};
+  let read = 0;
   try {
-    for (let page = 1; page <= 50; page++) {
+    for (let page = 1; page <= 100; page++) {
       const url = new URL(`${API}/${tiendanube.storeId}/orders`);
       url.search = new URLSearchParams({
-        created_at_min: min,
-        created_at_max: max,
-        payment_status: "paid",
+        updated_at_min: new Date(from).toISOString(),
         status: "any",
         per_page: "200",
         page: String(page),
-        fields: "id,number,total,status,payment_status,storefront,owner_note,note,contact_name,contact_phone,contact_email,billing_name,customer",
       }).toString();
       const res = await fetch(url, {
         headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA },
@@ -105,17 +136,34 @@ export async function storeSalesForMonth(month: string): Promise<StoreSales | nu
       if (res.status === 401 || res.status === 403) return { ok: false, error: "Tiendanube rechazó el token" };
       if (!res.ok) return { ok: false, error: `Tiendanube respondió ${res.status}` };
       const orders = (await res.json()) as TnOrder[];
+      read += orders.length;
       for (const o of orders) {
-        if (o.status === "cancelled" || o.payment_status !== "paid") continue;
+        const date = o.paid_at || o.created_at || "";
+        const t = Date.parse(date);
+        if (Number.isFinite(t) && !(t >= from && t < to)) continue; // de otro mes (sin fecha: se cuenta, ya vino filtrado por actualización)
         const origin = o.storefront || "desconocido";
         const total = Number(o.total) || 0;
-        const b = (byOrigin[origin] ??= { total: 0, ventas: 0 });
-        b.total += total;
-        b.ventas += 1;
-        const note = [o.owner_note, o.note, o.customer?.name, o.contact_name, o.billing_name].filter(Boolean).join(" · ");
-        const offName = note.match(OFF_MARK)?.[1] ?? null;
-        // Venta off: marcada "OFF/Nombre", o cargada a mano en el panel (origen manual).
-        if (!offName && !OFF_ORIGINS.includes(origin)) continue;
+        const text = noteText(o);
+        const offName = text.match(OFF_MARK)?.[1] ?? null;
+        const manual = OFF_ORIGINS.includes(origin);
+        // Venta off = marcada "off/Nombre" en las notas. Los manuales sin marca se muestran para revisar, pero no cuentan.
+        const isOff = !!offName;
+        const paid = o.payment_status === "paid" && o.status !== "cancelled";
+        if (paid) {
+          const b = (byOrigin[origin] ??= { total: 0, ventas: 0 });
+          b.total += total;
+          b.ventas += 1;
+        }
+        if (!isOff && !manual) continue;
+        const reason = !isOff
+          ? "sin “off/Nombre” en las notas"
+          : o.status === "cancelled"
+            ? "cancelado"
+            : paid
+              ? null
+              : (PAYMENT_LABELS[o.payment_status] ?? `pago: ${o.payment_status}`);
+        checks.push({ id: o.id, number: o.number ?? null, total, origin, date, offName, counted: isOff && paid, reason });
+        if (!isOff || !paid) continue;
         off.push({
           id: o.id,
           number: o.number ?? null,
@@ -123,7 +171,7 @@ export async function storeSalesForMonth(month: string): Promise<StoreSales | nu
           origin,
           phone: o.contact_phone || o.customer?.phone || null,
           email: (o.contact_email || o.customer?.email || null)?.toLowerCase() ?? null,
-          note,
+          note: text,
           offName,
         });
       }
@@ -132,7 +180,8 @@ export async function storeSalesForMonth(month: string): Promise<StoreSales | nu
   } catch {
     return { ok: false, error: "No se pudo conectar con Tiendanube" };
   }
-  return { ok: true, off, byOrigin };
+  checks.sort((a, b) => b.date.localeCompare(a.date));
+  return { ok: true, off, byOrigin, checks, read };
 }
 
 /** Paso final de la autorización: cambia el "code" por el token de la tienda. */

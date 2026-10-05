@@ -348,3 +348,20 @@ El usuario quiere ver todos esos contactos en el tablero.
   - "OFF - bruno" en la nota → Bruno;
   - "OFF/Brian" y un manual sin datos → sin asignar;
   - la compra web sin marca y el cancelado no cuentan.
+
+
+## 13. PR #20 (5/10): solo "off/Nombre" en las notas, y revisión pedido por pedido
+
+- **Lo que reportó el usuario, ya con la tienda conectada en producción:** el CRM mostraba más de $6.000.000 vendidos y lo real era unos $4.700.000. La diferencia estaba toda en Fabricio; Mariano y Bruno daban bien.
+- **Ejemplo real de cómo cargan:** nota del vendedor `off/fabricio/wsp / comp ICBC`.
+- **Causa probable:**
+  1. Se contaban también los pedidos de origen manual (`form`) **sin** marca.
+  2. Se asignaban "por cliente" (celular o mail de una tarjeta del CRM). Fabricio tenía muchas tarjetas importadas de ClickUp, así que se llevaba ventas ajenas.
+- **Regla final:**
+  - **Solo** cuenta un pedido pagado y no cancelado con `off/Nombre` en `owner_note` o `note`. Ya no se mira el resto del pedido.
+  - Se toma por **fecha de pago** (`paid_at`; si no tiene, `created_at`) dentro del mes. Se piden los pedidos con `updated_at_min` = día 1, así entran los creados antes y cobrados este mes.
+  - El vendedor sale **solo** del nombre de la marca. Si no coincide con nadie del equipo, queda "sin asignar". Ya no hay asignación por cliente.
+- **`/tiendanube` → "Revisar pedido por pedido":** tabla con #, fecha, marca, monto y ✔ vendedor, o ✗ motivo: pago pendiente, cancelado, sin "off/Nombre" o nombre que no es del equipo. Sirve para comparar contra lo que el usuario ve en Tiendanube.
+- **`OFF_ORIGINS`:** ahora solo sirve para listar en la revisión los manuales sin marca; no los cuenta.
+- **Cache:** `storeSalesForMonth` usa la caché de fetch de Next (10 minutos). En desarrollo local hay que borrar `.next/cache/fetch-cache` al cambiar el mock.
+- **Pendiente:** que el usuario compare la tabla con Tiendanube. Si la diferencia sigue, revisar si su número "real" incluye el envío (se suma `total`, que incluye envío) o si filtra por fecha de creación en vez de fecha de pago.
