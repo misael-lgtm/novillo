@@ -23,7 +23,8 @@ export async function GoalBar() {
   }
 
   const [y, m, d] = today.split("-").map(Number);
-  const daysLeft = new Date(Date.UTC(y, m, 0)).getUTCDate() - d;
+  // Hoy cuenta como día que falta: el 5/10 faltan 27 (del 5 al 31 inclusive).
+  const daysLeft = new Date(Date.UTC(y, m, 0)).getUTCDate() - d + 1;
   const mine = members.find((x) => x.scope === me.email && x.goal);
   const withGoal = members.filter((x) => x.goal).sort((a, b) => percent(b) - percent(a));
 
@@ -37,7 +38,7 @@ export async function GoalBar() {
             <b>{formatMoney(total.total)}</b> de {formatMoney(total.goal)} · <b>{percent(total)}%</b>
             <span className="text-stone-500">
               {" "}
-              · {total.ventas} {total.ventas === 1 ? "venta" : "ventas"} · {daysLeft === 0 ? "último día" : `faltan ${daysLeft} días`}
+              · {total.ventas} {total.ventas === 1 ? "venta" : "ventas"} · {daysLeft === 1 ? "último día" : `faltan ${daysLeft} días`}
             </span>
           </span>
           {mine && (
