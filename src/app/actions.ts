@@ -523,6 +523,13 @@ export async function setOrderArchived(orderId: string, archived: boolean): Prom
   return { ok: true };
 }
 
+/** Nota escrita desde la tarjeta del tablero. */
+export async function addCardNote(orderId: string, message: string): Promise<ActionResult> {
+  const fd = new FormData();
+  fd.set("message", message);
+  return addNote(orderId, null, fd);
+}
+
 export async function addNote(orderId: string, _prev: unknown, fd: FormData): Promise<ActionResult> {
   const { supabase, me } = await requireMember();
   const message = str(fd, "message");

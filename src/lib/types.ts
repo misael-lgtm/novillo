@@ -44,6 +44,10 @@ export type Order = {
   created_at: string;
   stage_changed_at: string;
   archived_at: string | null;
+  /** Copia de la última nota (la llena la base al agregar una nota). */
+  last_note: string | null;
+  last_note_at: string | null;
+  last_note_by: string | null;
 };
 
 export type OrderWithCustomer = Order & {

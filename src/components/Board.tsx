@@ -14,7 +14,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { loadMoreOrders, moveOrder, moveOrders } from "@/app/actions";
+import { addCardNote, loadMoreOrders, moveOrder, moveOrders } from "@/app/actions";
 import { FINAL_STAGES, STAGES, channelLabel, nextStage, type StageId } from "@/lib/config";
 import { formatMoney, missingForStage, type RequiredField } from "@/lib/rules";
 import type { OrderWithCustomer, TeamMember } from "@/lib/types";
@@ -160,6 +160,14 @@ export function Board({
     });
   }
 
+  async function saveNote(order: OrderWithCustomer, message: string): Promise<string | null> {
+    const r = await addCardNote(order.id, message);
+    if (!r.ok) return r.error;
+    const at = new Date().toISOString();
+    setOrders((os) => os.map((o) => (o.id === order.id ? { ...o, last_note: message, last_note_at: at, last_note_by: me } : o)));
+    return null;
+  }
+
   const teamName = (email: string) => team.find((m) => m.email === email)?.name.split(" ")[0] ?? email.split("@")[0];
 
   const draggedOrder = dragging ? orders.find((o) => o.id === dragging) : undefined;
@@ -245,6 +253,7 @@ export function Board({
                       key={o.id}
                       order={o}
                       who={teamName(o.assigned_to)}
+                      noteBy={o.last_note_by ? teamName(o.last_note_by) : undefined}
                       checked={selected.has(o.id)}
                       onToggle={() => toggle([o.id], !selected.has(o.id))}
                     />
@@ -255,6 +264,8 @@ export function Board({
                       who={teamName(o.assigned_to)}
                       nextLabel={next?.label}
                       onNext={next ? () => requestMove(o, next.id) : undefined}
+                      onNote={(message) => saveNote(o, message)}
+                      noteBy={o.last_note_by ? teamName(o.last_note_by) : undefined}
                     />
                   ),
                 )}
@@ -264,7 +275,14 @@ export function Board({
         </div>
         {/* La tarjeta que se arrastra va por encima de todo: las columnas tienen scroll y la recortarían. */}
         <DragOverlay>
-          {draggedOrder && <CardFace order={draggedOrder} who={teamName(draggedOrder.assigned_to)} className="rotate-2 shadow-lg" />}
+          {draggedOrder && (
+            <CardFace
+              order={draggedOrder}
+              who={teamName(draggedOrder.assigned_to)}
+              noteBy={draggedOrder.last_note_by ? teamName(draggedOrder.last_note_by) : undefined}
+              className="rotate-2 shadow-lg"
+            />
+          )}
         </DragOverlay>
       </DndContext>
 
@@ -414,29 +432,91 @@ function daysAgo(iso: string) {
 function Card({
   order,
   who,
+  noteBy,
   nextLabel,
   onNext,
+  onNote,
 }: {
   order: OrderWithCustomer;
   who: string;
+  noteBy?: string;
   nextLabel?: string;
   onNext?: () => void;
+  onNote: (message: string) => Promise<string | null>;
 }) {
   // Mientras se arrastra, la que se mueve es la copia del DragOverlay; esta queda marcada en su lugar.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: order.id });
+  const [writing, setWriting] = useState(false);
+  const [text, setText] = useState("");
+  const [noteError, setNoteError] = useState<string | null>(null);
+  const [saving, startSaving] = useTransition();
+  // Que tocar los botones o escribir no arranque un arrastre.
+  const noDrag = { onPointerDown: (e: React.PointerEvent) => e.stopPropagation(), onTouchStart: (e: React.TouchEvent) => e.stopPropagation() };
+
+  function save() {
+    const message = text.trim();
+    if (!message) return;
+    startSaving(async () => {
+      const err = await onNote(message);
+      setNoteError(err);
+      if (!err) {
+        setText("");
+        setWriting(false);
+      }
+    });
+  }
 
   return (
     <div ref={setNodeRef} {...listeners} {...attributes} className={`touch-manipulation ${isDragging ? "opacity-40" : ""}`}>
-      <CardFace order={order} who={who}>
-        {onNext && (
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onClick={onNext}
-            className="mt-2 w-full rounded-md bg-stone-100 py-1.5 text-xs font-semibold hover:bg-stone-200"
-          >
-            Pasar a {nextLabel} →
-          </button>
+      <CardFace order={order} who={who} noteBy={noteBy}>
+        {writing ? (
+          <div {...noDrag} className="mt-2 space-y-2">
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  save();
+                }
+                if (e.key === "Escape") setWriting(false);
+              }}
+              rows={2}
+              autoFocus
+              aria-label="Nota"
+              placeholder="Ej: pasa el viernes a pagar"
+              className="input py-1.5 text-sm"
+            />
+            {noteError && <p className="text-xs font-medium text-rose-700">{noteError}</p>}
+            <div className="flex gap-2">
+              <button onClick={() => setWriting(false)} className="flex-1 rounded-md bg-stone-100 py-1.5 text-xs font-semibold hover:bg-stone-200">
+                Cancelar
+              </button>
+              <button
+                onClick={save}
+                disabled={saving || !text.trim()}
+                className="flex-1 rounded-md bg-stone-900 py-1.5 text-xs font-semibold text-white hover:bg-stone-700 disabled:opacity-50"
+              >
+                {saving ? "Guardando…" : "Guardar nota"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div {...noDrag} className="mt-2 flex gap-2">
+            <button
+              onClick={() => setWriting(true)}
+              className="rounded-md bg-stone-100 px-2.5 py-1.5 text-xs font-semibold hover:bg-stone-200"
+              title="Escribir una nota en esta tarjeta"
+            >
+              ✏️ Nota
+            </button>
+            {onNext && (
+              <button onClick={onNext} className="flex-1 rounded-md bg-stone-100 py-1.5 text-xs font-semibold hover:bg-stone-200">
+                Pasar a {nextLabel} →
+              </button>
+            )}
+          </div>
         )}
       </CardFace>
     </div>
@@ -446,17 +526,19 @@ function Card({
 function SelectCard({
   order,
   who,
+  noteBy,
   checked,
   onToggle,
 }: {
   order: OrderWithCustomer;
   who: string;
+  noteBy?: string;
   checked: boolean;
   onToggle: () => void;
 }) {
   return (
     <button type="button" role="checkbox" aria-checked={checked} onClick={onToggle} className="text-left">
-      <CardFace order={order} who={who} asLink={false} className={checked ? "ring-2 ring-stone-900" : ""}>
+      <CardFace order={order} who={who} noteBy={noteBy} asLink={false} className={checked ? "ring-2 ring-stone-900" : ""}>
         <span className={`mt-2 flex items-center gap-2 text-xs font-semibold ${checked ? "" : "text-stone-500"}`}>
           <span
             className={`grid h-4 w-4 place-items-center rounded border ${checked ? "border-stone-900 bg-stone-900 text-white" : "border-stone-400"}`}
@@ -473,12 +555,14 @@ function SelectCard({
 function CardFace({
   order,
   who,
+  noteBy,
   className = "",
   asLink = true,
   children,
 }: {
   order: OrderWithCustomer;
   who: string;
+  noteBy?: string;
   className?: string;
   /** En modo selección la tarjeta no abre el pedido: tocarla la elige. */
   asLink?: boolean;
@@ -498,6 +582,17 @@ function CardFace({
         <p className="font-semibold leading-tight">{order.customer.name}</p>
         {order.customer.instagram && <p className="text-xs text-stone-500">@{order.customer.instagram}</p>}
         <p className="line-clamp-2 text-sm text-stone-700">{order.description}</p>
+        {order.last_note && (
+          <p className="line-clamp-3 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900" title={order.last_note}>
+            💬 {order.last_note}
+            {order.last_note_at && (
+              <span className="text-amber-700">
+                {" "}
+                — {noteBy ?? "?"}, {daysAgo(order.last_note_at)}
+              </span>
+            )}
+          </p>
+        )}
         <div className="flex items-center justify-between pt-1 text-xs">
           <span className="font-semibold">{order.kind === "cambio" && order.total == null ? "Sin cargo" : formatMoney(order.total)}</span>
           <span className={stale ? "font-semibold text-amber-700" : "text-stone-500"}>
