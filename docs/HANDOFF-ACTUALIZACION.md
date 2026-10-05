@@ -333,3 +333,18 @@ El usuario quiere ver todos esos contactos en el tablero.
 - **Estado:** el usuario estaba conectando la tienda. Tiendanube le mostró un `curl` con el `code` en vez de redirigir.
   - Se le indicó abrir `https://wayfarer-crm.vercel.app/tiendanube?code=…` dentro de los 5 minutos, con APP_ID y CLIENT_SECRET ya cargados en Vercel.
   - El `client_secret` quedó visible en una captura del chat: se le recomendó regenerarlo después de conectar.
+
+
+## 12. PR #19 (5/10): marca "OFF/Nombre"
+
+- **Cómo marcan los chicos sus ventas en Tiendanube:** "OFF/Mariano", "OFF/Fabricio", etc.
+- **Regla `OFF_MARK`** (`/\bOFF\s*[\/|\-]\s*(nombre)/i`): se busca en `owner_note`, `note`, `customer.name`, `contact_name` y `billing_name`.
+- **Es venta off** todo pedido pagado y no cancelado que tenga la marca, venga de donde venga, más los de origen manual (`OFF_ORIGINS`, por defecto `form`).
+- **Vendedor:** sale del nombre de la marca, comparando el principio sin tildes y con al menos 4 letras ("Mariano" → Marian, "Fabri" → Fabricio).
+  - Si el nombre no está en el equipo (ej. "Brian"), se sigue con las otras reglas: nombre en la nota, después celular o mail del cliente del CRM, y si nada sirve, "sin asignar".
+- **`/tiendanube`** resume "Ventas off que cuentan: $X (N pedidos, K con OFF/Nombre)" y debajo muestra todos los pedidos pagados por origen.
+- **Probado con el mock:**
+  - "OFF/Mariano" en el nombre del cliente de una compra web → Marian;
+  - "OFF - bruno" en la nota → Bruno;
+  - "OFF/Brian" y un manual sin datos → sin asignar;
+  - la compra web sin marca y el cancelado no cuentan.

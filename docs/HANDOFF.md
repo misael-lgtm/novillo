@@ -434,7 +434,7 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
 7. 1/10/2026: los 2 pedidos de "Hablar de nuevo" (#8459, #8584) se pasaron a "Más adelante" por SQL a pedido del usuario, con su tarea "Volver a contactar" para el 31/10 (`created_by` = misael).
 8. 1/10/2026, **duplicados**: se archivaron (no borraron) 134 tarjetas de clientes que tenían más de una. Regla: si el cliente compró, quedan sus compras y se archiva todo lo demás (132 "Sin causa"); si no compró, queda la más avanzada/reciente (2 "Enviar nuevamente" repetidas). También se archivaron sus 2 tareas abiertas. Después, a pedido del usuario, también se archivaron las compras viejas de los 110 clientes que compraron varias veces (125 tarjetas); a cada uno le queda su compra más reciente. Resultado: **una tarjeta activa por cliente** (9.542 clientes = 9.542 tarjetas; Compró 2.083). Se ven en gris en la ficha del cliente y en Archivo; se pueden restaurar.
 
-**Historial de PRs:** #2 a #18, todos mergeados a `main`.
+**Historial de PRs:** #2 a #19, todos mergeados a `main`.
 - #2: casilla compartida + "¿Quién sos?".
 - #3: README con la URL.
 - #4: página de error de configuración.
@@ -452,6 +452,7 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
 - #16: días que faltan cuentan hoy.
 - #17: ventas de Tiendanube en el objetivo del equipo (migración 0006, página /tiendanube).
 - #18: los objetivos cuentan solo las ventas off (pedidos manuales de Tiendanube), asignadas a cada vendedor.
+- #19: marca "OFF/Nombre" para ventas off y vendedor.
 
 ---
 
