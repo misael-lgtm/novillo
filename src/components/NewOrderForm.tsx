@@ -70,7 +70,7 @@ export function NewOrderForm({ team, me }: { team: TeamMember[]; me: string }) {
               <Field label="Mail" name="new_email" error={err("new_email")} hint="Si te lo pasa, mejor. Si no, dejalo vacío">
                 <input id="new_email" name="new_email" type="email" inputMode="email" className="input" autoCapitalize="none" autoComplete="off" placeholder="juana@gmail.com" aria-invalid={!!err("new_email")} />
               </Field>
-              <p className="text-xs text-stone-500">Con Instagram o celular alcanza. Si ya existe, lo reconocemos solo.</p>
+              <p className="text-xs text-stone-500">Con Instagram, celular o mail alcanza. Si ya existe, lo reconocemos solo.</p>
               <button type="button" onClick={() => setIsNew(false)} className="text-sm underline">
                 ← Buscar cliente existente
               </button>

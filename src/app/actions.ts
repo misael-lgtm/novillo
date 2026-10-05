@@ -15,6 +15,7 @@ import {
 import {
   FIELD_LABELS,
   addDays,
+  formatMoney,
   missingForStage,
   normalizeInstagram,
   normalizePhoneAR,
@@ -25,6 +26,7 @@ import {
 } from "@/lib/rules";
 import { TEAM_SCOPE } from "@/lib/goals";
 import { FINAL_PAGE, ORDER_SELECT } from "@/lib/queries";
+import { fetchCustomersPage } from "@/lib/tiendanube";
 import { requireMember } from "@/lib/session";
 import type { ActionResult, Customer, Order, OrderWithCustomer } from "@/lib/types";
 
@@ -49,6 +51,7 @@ function friendly(error: PgError): string {
   if (error?.code === "23505") {
     if (msg.includes("instagram")) return "Ya hay un cliente con ese Instagram.";
     if (msg.includes("phone")) return "Ya hay un cliente con ese celular.";
+    if (msg.includes("email")) return "Ya hay un cliente con ese mail.";
     if (msg.includes("team_members")) return "Esa persona ya está en el equipo.";
     return "Eso ya existe.";
   }
@@ -164,7 +167,8 @@ function validateCustomer(fd: FormData, prefix = ""): { input: CustomerInput; fi
   if (!name || name.length < 2) fields[prefix + "name"] = "Poné el nombre";
   if (rawIg && !instagram) fields[prefix + "instagram"] = "Usuario de IG inválido (solo letras, números, . y _)";
   if (rawPhone && !phone) fields[prefix + "phone"] = "Celular inválido. Ej: 11 2345 6789";
-  if (!rawIg && !rawPhone) fields[prefix + "instagram"] = "Poné el Instagram o el celular (al menos uno)";
+  // Alcanza con uno: Instagram, celular o mail (los clientes de la tienda a veces solo tienen mail).
+  if (!rawIg && !rawPhone && !str(fd, prefix + "email")) fields[prefix + "instagram"] = "Poné el Instagram, el celular o el mail (al menos uno)";
   return { input: { name, instagram, phone }, fields };
 }
 
@@ -174,6 +178,7 @@ async function findOrCreateCustomer(input: CustomerInput): Promise<ActionResult<
   const ors: string[] = [];
   if (input.instagram) ors.push(`instagram.eq."${input.instagram}"`);
   if (input.phone) ors.push(`phone.eq."${input.phone}"`);
+  if (input.email) ors.push(`email.eq."${input.email.replace(/"/g, "")}"`); // los mails se guardan en minúscula
 
   const { data: existing } = await supabase
     .from("customers")
@@ -543,6 +548,114 @@ export async function addNote(orderId: string, _prev: unknown, fd: FormData): Pr
   if (error) return { ok: false, error: friendly(error) };
   refresh();
   return { ok: true };
+}
+
+// ── Clientes de Tiendanube ───────────────────────────────────
+
+export type TnImportStats = { read: number; created: number; linked: number; already: number; skipped: number; errors: number };
+
+/**
+ * Importa una página de clientes de Tiendanube (la página la va pidiendo la pantalla, de a una, hasta `done`).
+ * - Si ya se importó (mismo id de Tiendanube): no hace nada.
+ * - Si ya existe en el CRM con el mismo celular o mail: lo une (le guarda el id de Tiendanube y completa mail/celular/ciudad que falten).
+ * - Si no: lo crea con source 'tiendanube'.
+ * - Sin mail ni celular válido: se saltea.
+ */
+export async function importTiendanubeCustomers(page: number): Promise<ActionResult<{ stats: TnImportStats; done: boolean }>> {
+  const { supabase, me } = await requireMember();
+  if (!me.is_admin) return { ok: false, error: "Solo el admin puede importar." };
+  if (!Number.isInteger(page) || page < 1) return { ok: false, error: "Página inválida." };
+  const r = await fetchCustomersPage(page);
+  if (!r.ok) return { ok: false, error: r.error };
+
+  const stats: TnImportStats = { read: r.customers.length, created: 0, linked: 0, already: 0, skipped: 0, errors: 0 };
+  const rows = r.customers
+    .map((c) => {
+      const email = c.email && EMAIL_RE.test(c.email) ? c.email : null;
+      const phone = normalizePhoneAR(c.phone);
+      const name = (c.name && c.name.length >= 2 ? c.name : email?.split("@")[0]) ?? (phone ? `+${phone}` : null);
+      return { tnId: c.id, email, phone, name, city: c.city?.trim() || null, totalSpent: c.totalSpent };
+    })
+    .filter((c) => {
+      const ok = !!(c.email || c.phone) && !!c.name && c.name.length >= 2;
+      if (!ok) stats.skipped++;
+      return ok;
+    });
+  if (!rows.length) return { ok: true, data: { stats, done: r.done } };
+
+  type Existing = { id: string; tn_customer_id: number | null; email: string | null; phone: string | null; city: string | null };
+  const cols = "id, tn_customer_id, email, phone, city";
+  const [byTn, byPhone, byEmail] = await Promise.all([
+    supabase.from("customers").select(cols).in("tn_customer_id", rows.map((x) => x.tnId)).returns<Existing[]>(),
+    rows.some((x) => x.phone)
+      ? supabase.from("customers").select(cols).in("phone", rows.flatMap((x) => (x.phone ? [x.phone] : []))).returns<Existing[]>()
+      : Promise.resolve({ data: [] as Existing[] }),
+    rows.some((x) => x.email)
+      ? supabase.from("customers").select(cols).in("email", rows.flatMap((x) => (x.email ? [x.email] : []))).returns<Existing[]>()
+      : Promise.resolve({ data: [] as Existing[] }),
+  ]);
+  const tnSeen = new Set((byTn.data ?? []).map((x) => x.tn_customer_id));
+  const phoneOf = new Map((byPhone.data ?? []).map((x) => [x.phone, x]));
+  const emailOf = new Map((byEmail.data ?? []).map((x) => [x.email, x]));
+
+  const toCreate: Record<string, unknown>[] = [];
+  const usedPhones = new Set<string>();
+  const usedEmails = new Set<string>();
+  for (const c of rows) {
+    if (tnSeen.has(c.tnId)) {
+      stats.already++;
+      continue;
+    }
+    const found = (c.phone && phoneOf.get(c.phone)) || (c.email && emailOf.get(c.email)) || null;
+    if (found) {
+      if (found.tn_customer_id) {
+        stats.already++;
+        continue;
+      }
+      const patch: Record<string, unknown> = { tn_customer_id: c.tnId };
+      if (!found.email && c.email && !emailOf.has(c.email)) patch.email = c.email;
+      if (!found.phone && c.phone && !phoneOf.has(c.phone)) patch.phone = c.phone;
+      if (!found.city && c.city) patch.city = c.city;
+      const { error } = await supabase.from("customers").update(patch).eq("id", found.id);
+      if (error) stats.errors++;
+      else {
+        stats.linked++;
+        found.tn_customer_id = c.tnId;
+      }
+      continue;
+    }
+    // Dentro de la misma página tampoco se repiten celular ni mail.
+    if ((c.phone && usedPhones.has(c.phone)) || (c.email && usedEmails.has(c.email))) {
+      stats.already++;
+      continue;
+    }
+    if (c.phone) usedPhones.add(c.phone);
+    if (c.email) usedEmails.add(c.email);
+    toCreate.push({
+      name: c.name,
+      email: c.email,
+      phone: c.phone,
+      city: c.city,
+      source: "tiendanube",
+      tn_customer_id: c.tnId,
+      notes: c.totalSpent ? `Importado de Tiendanube (gastó ${formatMoney(c.totalSpent)})` : "Importado de Tiendanube",
+    });
+  }
+
+  if (toCreate.length) {
+    const { error } = await supabase.from("customers").insert(toCreate);
+    if (!error) stats.created += toCreate.length;
+    else {
+      // Si alguno choca (ej. un mail o celular que ya existía con otro formato), se cargan de a uno.
+      for (const row of toCreate) {
+        const { error: e } = await supabase.from("customers").insert(row);
+        if (e) stats.errors++;
+        else stats.created++;
+      }
+    }
+  }
+  if (r.done) refresh();
+  return { ok: true, data: { stats, done: r.done } };
 }
 
 // ── Objetivos del mes ────────────────────────────────────────

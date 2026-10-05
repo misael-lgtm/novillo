@@ -437,3 +437,32 @@ El usuario quiere ver todos esos contactos en el tablero.
   - `OrderEditForm`: un select "Promo bancaria" para ponerla o cambiarla después.
 - **Historial (`Timeline`):** muestra "la promo bancaria" con su nombre.
 - **Limitación:** si la tarjeta ya tiene monto y medio de pago, pasarla a Compró no abre el diálogo, así que la promo se elige desde la página del pedido. Lo mismo al mover en lote.
+
+
+## 19. PR #28 (5/10): importar los clientes de Tiendanube
+
+- **Pedido del usuario:** "sumá toda la base de datos de TN a clientes".
+- **El token de la tienda solo está en Vercel**, así que la importación es un botón en `/tiendanube`. Lo ve solo el admin y solo con la tienda conectada: "👥 Clientes de la tienda → Importar clientes de Tiendanube".
+  - La pantalla pide las páginas de a una (200 clientes cada una) con la server action `importTiendanubeCustomers(page)` hasta `done`, y muestra el avance.
+- **`fetchCustomersPage(page)`** (`src/lib/tiendanube.ts`) hace `GET /customers?per_page=200&page=N`.
+  - Toma `name`, `email`, el celular (`phone`, si no `billing_phone`, si no `default_address.phone`), la ciudad y `total_spent`.
+- **Por cada cliente:**
+  - Si ya está su `tn_customer_id`, cuenta como "ya estaban".
+  - Si no, busca por celular normalizado o por mail en minúscula. Si lo encuentra, lo une: le guarda `tn_customer_id` y completa mail, celular y ciudad que falten.
+  - Si no existía, lo crea con `source='tiendanube'`, `tn_customer_id` y `notes` "Importado de Tiendanube (gastó $X)".
+  - Si no tiene mail ni celular válido, se saltea.
+  - Se puede repetir sin duplicar.
+- **Migración `0009_tiendanube_customers.sql`** (**ya aplicada en producción**):
+  - `customers.source` acepta `'tiendanube'`;
+  - columna nueva `tn_customer_id` con índice único;
+  - `customers_contact_required` ahora pide **IG, celular o mail**;
+  - los mails pasan a minúscula, con índice único `lower(email)`.
+- **App:**
+  - `validateCustomer` acepta solo mail ("Poné el Instagram, el celular o el mail");
+  - `findOrCreateCustomer` también busca por mail;
+  - `friendly()` traduce el error de mail duplicado.
+- **Probado con el mock (450 clientes en 3 páginas):**
+  - 447 nuevos, 1 unido por celular (con su mail completado), 1 salteado y 1 mail repetido no duplicado;
+  - repetir la importación no duplica nada;
+  - la ficha de un cliente con solo mail abre bien.
+- **Estado:** falta que el usuario apriete el botón en producción. No se corrió desde acá porque el token está solo en Vercel.
