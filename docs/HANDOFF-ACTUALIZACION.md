@@ -267,3 +267,40 @@ El usuario quiere ver todos esos contactos en el tablero.
   - vaciar un monto saca ese objetivo y otro mes arranca vacío;
   - una vendedora ve la barra pero no entra a Equipo;
   - el tablero sigue entrando en 900px.
+
+
+## 10. PR #17 (5/10): ventas de la tienda online (Tiendanube) en el objetivo
+
+- **Pedido del usuario:** que el objetivo cuente las ventas de la tienda y no solo lo cargado en el CRM.
+- **Decisiones del usuario:**
+  - conectar con la API de Tiendanube, no cargar el número a mano;
+  - contar cada venta **una sola vez**.
+- **Regla de conteo:**
+  - **Objetivo del equipo** = CRM (Compró del mes) − CRM con `channel='tienda_online'` + pedidos de Tiendanube del mes.
+  - **Objetivo de cada vendedor:** sigue contando solo sus tarjetas, incluidas las de canal Tienda online.
+  - Si la tienda no está conectada o da error, el equipo usa solo el CRM y la barra avisa del error.
+- **`src/lib/tiendanube.ts`:**
+  - `storeSalesForMonth(month)` hace `GET {API}/{store_id}/orders`, con:
+    - `created_at_min` = día 1 a las 00:00 -03:00 y `created_at_max` = fin de mes;
+    - `payment_status=paid`, `status=any`, `per_page=200`, paginando;
+    - el header `Authentication: bearer TOKEN` (así lo pide Tiendanube) y un `User-Agent` "Wayfarer CRM (…)".
+  - Saltea los `cancelled` y suma `total`, que incluye el envío.
+  - Un 404 se toma como página vacía. Se cachea 10 minutos (`next.revalidate=600`).
+  - `exchangeCode(code)` hace `POST https://www.tiendanube.com/apps/authorize/token`.
+  - `TIENDANUBE_API_URL` existe **solo para pruebas** con un mock.
+- **Variables de entorno en Vercel** (solo servidor; documentadas en `.env.example`): `TIENDANUBE_APP_ID`, `TIENDANUBE_CLIENT_SECRET`, `TIENDANUBE_STORE_ID` y `TIENDANUBE_TOKEN`.
+- **Página `/tiendanube`** (solo admin, con acceso desde Equipo, "🛒 Tienda online"):
+  - Muestra el estado de la conexión, o el paso a paso para crear la app en partners.tiendanube.com: permiso de lectura de órdenes y redirect `https://wayfarer-crm.vercel.app/tiendanube`.
+  - Pide cargar APP_ID y CLIENT_SECRET, y después muestra el botón "Autorizar en mi tienda".
+  - Cuando Tiendanube vuelve con `?code`, la página hace el canje y **muestra en pantalla STORE_ID y TOKEN** para que el admin los copie a Vercel y haga Redeploy. El token no se guarda en la base.
+- **Migración `0006_store_sales.sql`:** `month_sales_tienda(p_month)`. **Ya aplicada en producción.**
+- **Barra:** en "Ver detalle" se muestra "Incluye la tienda online: $X (N pedidos pagados)…" o el aviso de error.
+- **Ojo:** no se pudo leer la documentación oficial (la red del contenedor bloquea tiendanube.github.io), así que se armó con lo conocido de la API v1. Si al conectar algo falla, el error queda visible en `/tiendanube` y en la barra.
+- **Probado con Playwright y un Tiendanube de mentira** (`/var/tmp/e2e/tnmock.mjs`, no está en el repo):
+  - la suma da 70% y no hay doble conteo;
+  - excluye los cancelados;
+  - el vendedor sigue con su tarjeta;
+  - los parámetros, el header y el User-Agent son los esperados;
+  - con token malo cae a solo CRM y avisa;
+  - sin conectar, muestra el paso a paso.
+- **Estado:** el usuario tiene que crear la app en Tiendanube y cargar las variables. Todavía **no está conectada**.
