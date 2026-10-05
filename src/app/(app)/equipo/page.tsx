@@ -3,7 +3,7 @@ import { getTeam, requireMember } from "@/lib/session";
 import Link from "next/link";
 import { getGoalSummary, monthStart } from "@/lib/goals";
 import { formatMoney } from "@/lib/rules";
-import { AddMemberForm, GoalsForm, MemberToggle } from "@/components/Team";
+import { AddMemberForm, AvatarInput, GoalsForm, MemberToggle } from "@/components/Team";
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
   const { supabase, me } = await requireMember();
@@ -24,11 +24,14 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       <ul className="card divide-y divide-stone-100">
         {team.map((m) => (
           <li key={m.email} className={`flex items-center justify-between gap-3 px-4 py-3 ${m.active ? "" : "opacity-50"}`}>
-            <div>
+            <div className="flex items-center gap-3">
+              <AvatarInput email={m.email} avatar={m.avatar} />
+              <div>
               <p className="font-semibold">
                 {m.name} {m.is_admin && <span className="ml-1 rounded bg-stone-900 px-1.5 py-0.5 text-xs text-white">admin</span>}
               </p>
               <p className="text-sm text-stone-500">{m.login_email ? `Entra con ${m.login_email}` : m.email}</p>
+              </div>
             </div>
             {m.email !== me.email && <MemberToggle email={m.email} active={m.active} />}
           </li>

@@ -15,7 +15,7 @@ export function monthLabel(month: string): string {
   return new Date(month + "T12:00:00Z").toLocaleDateString("es-AR", { timeZone: "UTC", month: "long", year: "numeric" });
 }
 
-export type GoalLine = { scope: string; name: string; goal: number | null; total: number; ventas: number };
+export type GoalLine = { scope: string; name: string; avatar?: string | null; goal: number | null; total: number; ventas: number };
 
 type Tally = { total: number; ventas: number };
 
@@ -83,6 +83,7 @@ export async function getGoalSummary(supabase: SupabaseClient, team: TeamMember[
     .map((m) => ({
       scope: m.email,
       name: m.name,
+      avatar: m.avatar,
       goal: goalOf.get(m.email) ?? null,
       total: saleOf.get(m.email)?.total ?? 0,
       ventas: saleOf.get(m.email)?.ventas ?? 0,

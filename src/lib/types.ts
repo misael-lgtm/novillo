@@ -7,6 +7,8 @@ export type TeamMember = {
   login_email: string | null;
   is_admin: boolean;
   active: boolean;
+  /** "Fotito" (un emoji) que se muestra al lado del nombre. */
+  avatar: string | null;
 };
 
 export type Customer = {
