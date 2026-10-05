@@ -22,6 +22,7 @@ import {
   type OrderFields,
   type RequiredField,
 } from "@/lib/rules";
+import { TEAM_SCOPE } from "@/lib/goals";
 import { FINAL_PAGE, ORDER_SELECT } from "@/lib/queries";
 import { requireMember } from "@/lib/session";
 import type { ActionResult, Customer, Order, OrderWithCustomer } from "@/lib/types";
@@ -540,6 +541,49 @@ export async function addNote(orderId: string, _prev: unknown, fd: FormData): Pr
   if (error) return { ok: false, error: friendly(error) };
   refresh();
   return { ok: true };
+}
+
+// ── Objetivos del mes ────────────────────────────────────────
+
+/** El admin carga el objetivo del equipo y el de cada vendedor para un mes. Vacío = sin objetivo. */
+export async function saveGoals(_prev: unknown, fd: FormData): Promise<ActionResult> {
+  const { supabase, me } = await requireMember();
+  if (!me.is_admin) return { ok: false, error: "Solo el admin carga objetivos." };
+  const mes = str(fd, "month");
+  if (!mes || !/^\d{4}-\d{2}$/.test(mes)) return { ok: false, error: "Elegí el mes.", fields: { month: "Elegí el mes" } };
+  const month = `${mes}-01`;
+
+  const { data: team } = await supabase.from("team_members").select("email");
+  const scopes = [TEAM_SCOPE, ...(team ?? []).map((m) => m.email as string)];
+  const fields: Record<string, string> = {};
+  const upserts: { month: string; scope: string; amount: number }[] = [];
+  const clears: string[] = [];
+  for (const scope of scopes) {
+    const key = `goal:${scope}`;
+    if (!fd.has(key)) continue;
+    const raw = str(fd, key);
+    if (!raw) {
+      clears.push(scope);
+      continue;
+    }
+    const amount = parseMoney(raw);
+    if (!amount) fields[key] = "Monto inválido. Ej: 1.500.000";
+    else upserts.push({ month, scope, amount });
+  }
+  if (Object.keys(fields).length) return { ok: false, error: "Revisá los montos marcados.", fields };
+
+  if (upserts.length) {
+    const { error } = await supabase
+      .from("monthly_goals")
+      .upsert(upserts.map((u) => ({ ...u, updated_by: me.email, updated_at: new Date().toISOString() })));
+    if (error) return { ok: false, error: friendly(error) };
+  }
+  if (clears.length) {
+    const { error } = await supabase.from("monthly_goals").delete().eq("month", month).in("scope", clears);
+    if (error) return { ok: false, error: friendly(error) };
+  }
+  refresh();
+  return { ok: true, message: "Objetivos guardados ✔" };
 }
 
 // ── Tareas ───────────────────────────────────────────────────

@@ -237,3 +237,33 @@ El usuario quiere ver todos esos contactos en el tablero.
   - que exporte de ClickUp un CSV **con las tareas cerradas incluidas**. El CSV de antes (`public.clickup_import`) no tiene ninguna cerrada;
   - o que diga "seguí" para seguir de a una (unas 2 a 3 horas).
 - **Sin respuesta:** si al cargar un "Nuevo pedido" para un cliente con tarjeta se reusa esa tarjeta en vez de crear otra.
+
+
+## 9. PR #15 (5/10): objetivos del mes
+
+- **Pedido del usuario:** "un contador de cómo venimos con el objetivo arriba del CRM y uno por vendedor; yo cargo manual por mes".
+- **Barra arriba de todas las páginas** (`src/components/GoalBar.tsx`, en `(app)/layout.tsx` debajo del `Nav`):
+  - Muestra "🎯 Objetivo de octubre de 2026", una barra de progreso, "$ X de $ Y · N% · K ventas · faltan D días" y "Vos: N%" si el que mira tiene objetivo.
+  - Es un `<details>`: al tocarlo se abre la lista por vendedor con su barra (verde cuando llega al 100%).
+  - Si el mes no tiene objetivo, el admin ve un aviso con link a `/equipo#objetivos` y los demás no ven nada.
+- **Carga** (`GoalsForm` en `src/components/Team.tsx`, en `/equipo`, solo admin):
+  - Se elige el mes (`?mes=YYYY-MM`) y se cargan el objetivo del equipo y el de cada vendedor, en pesos.
+  - Si un campo queda vacío, se borra ese objetivo.
+  - Si no hay objetivo del equipo, se usa la suma de los vendedores.
+  - Server action `saveGoals`.
+- **Cómo se mide** (función SQL `month_sales(p_month)`): pedidos con `stage='compro'` y `stage_changed_at` dentro del mes en hora argentina, agrupados por `assigned_to`, sumando `total`.
+  - Incluye los archivados.
+  - Si una tarjeta sale de Compró, deja de contar.
+- **Migración `0005_monthly_goals.sql`**, ya aplicada en producción:
+  - tabla `monthly_goals(month, scope, amount)`, con `scope` = `'equipo'` o el email del vendedor;
+  - RLS: leen todos los del equipo; insert, update y delete solo el admin.
+- **Lógica nueva** en `src/lib/goals.ts`: `monthStart`, `monthLabel`, `getGoalSummary` y `percent`.
+- **Board:** el alto de las columnas pasó a `max-h-[calc(100dvh-25rem)] md:max-h-[calc(100dvh-19rem)]` para que entre la barra.
+- **Estado al aplicarlo (5/10):** octubre ya tenía 12 ventas cargadas en el CRM, por $2.087.697. Todavía no hay objetivos cargados: los carga el usuario.
+- **Probado con Playwright local:**
+  - aviso al admin cuando falta el objetivo;
+  - un monto inválido no guarda nada;
+  - guardar, ver los porcentajes y el "Vos";
+  - vaciar un monto saca ese objetivo y otro mes arranca vacío;
+  - una vendedora ve la barra pero no entra a Equipo;
+  - el tablero sigue entrando en 900px.

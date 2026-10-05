@@ -377,7 +377,7 @@ function Column({
     <section
       id={id}
       ref={setNodeRef}
-      className={`flex max-h-[calc(100dvh-21rem)] md:max-h-[calc(100dvh-14rem)] min-h-64 w-72 shrink-0 snap-start flex-col rounded-xl border-2 p-2 transition ${color} ${isOver ? "ring-4 ring-stone-900/20" : ""}`}
+      className={`flex max-h-[calc(100dvh-25rem)] md:max-h-[calc(100dvh-19rem)] min-h-64 w-72 shrink-0 snap-start flex-col rounded-xl border-2 p-2 transition ${color} ${isOver ? "ring-4 ring-stone-900/20" : ""}`}
     >
       <header className="px-2 pb-2 pt-1" title={help}>
         <h2 className="flex items-center justify-between font-bold">

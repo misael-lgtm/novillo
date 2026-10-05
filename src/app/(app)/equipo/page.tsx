@@ -1,11 +1,15 @@
 import { redirect } from "next/navigation";
 import { getTeam, requireMember } from "@/lib/session";
-import { AddMemberForm, MemberToggle } from "@/components/Team";
+import { getGoalSummary, monthStart } from "@/lib/goals";
+import { AddMemberForm, GoalsForm, MemberToggle } from "@/components/Team";
 
-export default async function TeamPage() {
-  const { me } = await requireMember();
+export default async function TeamPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
+  const { supabase, me } = await requireMember();
   if (!me.is_admin) redirect("/");
   const team = await getTeam();
+  const { mes } = await searchParams;
+  const month = mes && /^\d{4}-\d{2}$/.test(mes) ? `${mes}-01` : monthStart();
+  const goals = await getGoalSummary(supabase, team, month);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -28,6 +32,11 @@ export default async function TeamPage() {
           </li>
         ))}
       </ul>
+      <GoalsForm
+        month={month.slice(0, 7)}
+        teamGoal={goals.explicitTeamGoal}
+        members={goals.members.map((m) => ({ email: m.scope, name: m.name, goal: m.goal, total: m.total }))}
+      />
       <AddMemberForm sharedLogins={[...new Set(team.map((m) => m.login_email).filter((l): l is string => !!l))]} />
     </div>
   );
