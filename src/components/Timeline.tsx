@@ -1,7 +1,7 @@
 "use client";
 
 import { addNote } from "@/app/actions";
-import { carrierLabel, channelLabel, paymentLabel, stageLabel } from "@/lib/config";
+import { bankPromoLabel, carrierLabel, channelLabel, paymentLabel, stageLabel } from "@/lib/config";
 import { formatDateTime, formatMoney } from "@/lib/rules";
 import type { Activity, TeamMember } from "@/lib/types";
 import { ResultBanner, SubmitButton, useFormAction } from "./ui";
@@ -10,6 +10,7 @@ const FIELD_NAMES: Record<string, string> = {
   description: "lo que pidió",
   total: "el monto",
   payment_method: "el medio de pago",
+  bank_promo: "la promo bancaria",
   shipping_address: "la dirección",
   carrier: "el correo",
   tracking_code: "el seguimiento",
@@ -31,6 +32,7 @@ function fmt(field: string, v: unknown, team: TeamMember[]): string {
   if (field === "stage") return stageLabel(String(v));
   if (field === "total") return formatMoney(Number(v));
   if (field === "payment_method") return paymentLabel(String(v));
+  if (field === "bank_promo") return bankPromoLabel(String(v));
   if (field === "carrier") return carrierLabel(String(v));
   if (field === "channel") return channelLabel(String(v));
   if (field === "assigned_to") return team.find((m) => m.email === v)?.name ?? String(v);

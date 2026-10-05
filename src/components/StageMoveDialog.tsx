@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { moveOrder } from "@/app/actions";
-import { CARRIERS, PAYMENT_METHODS, STAGES, type StageId } from "@/lib/config";
+import { BANK_PROMOS, CARRIERS, PAYMENT_METHODS, STAGES, type StageId } from "@/lib/config";
 import { FIELD_LABELS, type RequiredField } from "@/lib/rules";
 import type { ActionResult } from "@/lib/types";
 import { Field, Modal, ResultBanner } from "./ui";
@@ -75,6 +75,12 @@ function MissingInput({ field, error }: { field: RequiredField; error?: string }
       return (
         <Field label={label} name={field} error={error} required>
           <RadioGroup name={field} options={PAYMENT_METHODS} />
+          <p className="pt-3 text-sm font-medium">
+            Promo bancaria <span className="font-normal text-stone-500">(opcional)</span>
+          </p>
+          <div className="pt-1.5">
+            <RadioGroup name="bank_promo" options={[{ id: "", label: "Sin promo" }, ...BANK_PROMOS]} defaultValue="" optional />
+          </div>
         </Field>
       );
     case "carrier":
@@ -108,10 +114,13 @@ export function RadioGroup({
   name,
   options,
   defaultValue,
+  optional = false,
 }: {
   name: string;
   options: readonly { id: string; label: string }[];
   defaultValue?: string | null;
+  /** Si no es obligatorio elegir (ej. la promo bancaria). */
+  optional?: boolean;
 }) {
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -120,7 +129,7 @@ export function RadioGroup({
           key={o.id}
           className="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm has-[:checked]:border-stone-900 has-[:checked]:bg-stone-900 has-[:checked]:text-white"
         >
-          <input type="radio" name={name} value={o.id} required defaultChecked={defaultValue === o.id} className="sr-only" />
+          <input type="radio" name={name} value={o.id} required={!optional} defaultChecked={defaultValue === o.id} className="sr-only" />
           {o.label}
         </label>
       ))}

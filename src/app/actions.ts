@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  BANK_PROMO_IDS,
   CARRIER_IDS,
   CHANNEL_IDS,
   FIRST_STAGE,
@@ -86,6 +87,7 @@ function readOrderFields(fd: FormData): { patch: Partial<OrderFields>; fields: R
     patch.total = total;
   }
   if (fd.has("payment_method")) patch.payment_method = oneOf(str(fd, "payment_method"), PAYMENT_METHOD_IDS);
+  if (fd.has("bank_promo")) patch.bank_promo = oneOf(str(fd, "bank_promo"), BANK_PROMO_IDS);
   if (fd.has("carrier")) patch.carrier = oneOf(str(fd, "carrier"), CARRIER_IDS);
   if (fd.has("shipping_address")) patch.shipping_address = str(fd, "shipping_address");
   if (fd.has("tracking_code")) patch.tracking_code = str(fd, "tracking_code")?.toUpperCase() ?? null;

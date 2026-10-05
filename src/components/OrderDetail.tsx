@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { moveOrder, updateOrder } from "@/app/actions";
-import { CARRIERS, CHANNELS, LOST_STAGE, PAYMENT_METHODS, STAGES, nextStage, type StageId } from "@/lib/config";
+import { BANK_PROMOS, CARRIERS, CHANNELS, LOST_STAGE, PAYMENT_METHODS, STAGES, nextStage, type StageId } from "@/lib/config";
 import { STAGE_REQUIREMENTS, missingForStage, type RequiredField } from "@/lib/rules";
 import type { OrderWithCustomer, TeamMember } from "@/lib/types";
 import { StageMoveDialog } from "./StageMoveDialog";
@@ -91,6 +91,14 @@ export function OrderEditForm({ order, team }: { order: OrderWithCustomer; team:
             </select>
           </Field>
         </div>
+        <Field label="Promo bancaria" name="bank_promo" hint="Opcional">
+          <select id="bank_promo" name="bank_promo" defaultValue={order.bank_promo ?? ""} className="input sm:w-1/2">
+            <option value="">Sin promo</option>
+            {BANK_PROMOS.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        </Field>
         <Field label="Dirección de envío" name="shipping_address" error={err("shipping_address")} required={required.has("shipping_address")} hint="Calle, número, piso/depto, localidad, provincia, CP">
           <textarea id="shipping_address" name="shipping_address" rows={2} defaultValue={order.shipping_address ?? ""} className="input" aria-invalid={!!err("shipping_address")} />
         </Field>

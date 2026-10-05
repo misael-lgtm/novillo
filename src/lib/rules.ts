@@ -86,6 +86,8 @@ export type OrderFields = {
   /** Historial importado de ClickUp: sin datos de pago/envío en la etapa con la que llegó. */
   source?: string | null;
   source_stage?: string | null;
+  /** Promo bancaria: nunca es obligatoria. */
+  bank_promo?: string | null;
   total: number | null;
   payment_method: string | null;
   shipping_address: string | null;
@@ -94,7 +96,7 @@ export type OrderFields = {
   cancel_reason: string | null;
 };
 
-export type RequiredField = Exclude<keyof OrderFields, "kind" | "source" | "source_stage">;
+export type RequiredField = Exclude<keyof OrderFields, "kind" | "source" | "source_stage" | "bank_promo">;
 
 export const FIELD_LABELS: Record<RequiredField, string> = {
   total: "Monto total",
