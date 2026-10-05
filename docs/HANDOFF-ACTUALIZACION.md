@@ -1,12 +1,97 @@
-# CRM Wayfarer: actualización posterior al HANDOFF (1/10/2026)
+# CRM Wayfarer: todo lo que se hizo después del HANDOFF (1/10 al 5/10/2026)
 
-Esto va **después** de `docs/HANDOFF.md`, que se pasó cuando estaba mergeado hasta el PR #10 (modo oscuro + handoff). Acá está todo lo que se hizo después: PRs #11 y #12 y cambios directos en la base de producción. `docs/HANDOFF.md` ya está actualizado con esto mismo (§6, puntos 5 a 8, y el historial de PRs). Este archivo es el resumen para no tener que releer todo.
+Esto va **después** de `docs/HANDOFF.md`, que se pasó cuando estaba mergeado hasta el PR #10 (modo oscuro y estética). Este archivo junta todo lo que vino después: los **PRs #11 a #28** y los cambios hechos directo en la base de producción.
 
-**Estado de producción:**
-- `main` = `76b96a9`, con todo mergeado.
-- Vercel publica solo desde `main`. El PR #12 quedó publicándose ("Vercel is deploying") cuando se cerró la sesión, así que confirmá en el GitHub status de `main` que haya terminado bien.
+**Cómo leerlo:**
+- **Primero** "Estado actual". Es lo que vale hoy.
+- **Después**, si hace falta el detalle, las secciones 1 a 19. Están en orden de cómo se hicieron, y algunas reglas se cambiaron más adelante; cada sección dice si quedó reemplazada.
 
-**Rama de trabajo:** `claude/awesome-gauss-1hybhb`. Siempre se trabajó así: PR a `main`, merge, y Vercel publica.
+---
+
+## Estado actual (5/10/2026)
+
+### Producción y forma de trabajo
+- `main` = `1243c7c` (merge del PR #28). Vercel publica solo desde `main`.
+- El status "Vercel" del commit se ve con `gh api repos/misael-lgtm/novillo/commits/<sha>/status`.
+- vercel.app y tiendanube.com/github.io están bloqueados por el proxy del contenedor, así que **no se puede mirar la app en producción desde acá**.
+- **Rama de trabajo:** `claude/awesome-gauss-1hybhb`. Siempre se trabajó igual: commit, PR a `main`, merge. El usuario no revisa los PRs: quiere que quede publicado.
+- **Migraciones:** se aplican en producción con la herramienta de Supabase `apply_migration` (proyecto `hhjkhhtqueaprjyviufb`) **antes** de mergear el código que las usa. El archivo también va en `supabase/migrations/`.
+  - Ya aplicadas: **0001 a 0009**.
+  - Nuevas en este tramo:
+
+| Migración | Qué agrega |
+|---|---|
+| 0004 | notas en la tarjeta |
+| 0005 | objetivos |
+| 0006 | `month_sales_tienda`, ya no se usa |
+| 0007 | avatar |
+| 0008 | promo bancaria |
+| 0009 | clientes de Tiendanube |
+
+### Qué hace hoy el CRM (lo nuevo desde el HANDOFF)
+
+**Tablero**
+- Mover muchas tarjetas: "☑️ Seleccionar" (§2) y "Pasar todas a…" por columna (§3).
+- Compró y Sin causa muestran todo, de a 50, con "Ver más" (§3).
+- Botón **"✏️ Nota"** en cada tarjeta; la última nota se ve en la tarjeta (§7).
+
+**Clientes**
+- Una tarjeta activa por cliente: los duplicados se archivaron (§1.2).
+- El mail del contacto nuevo se pide pero es **opcional** (§2.3, cambiado por el PR #13).
+- Un cliente puede tener **solo mail**: alcanza con IG, celular o mail (§19).
+- Importación de **clientes de Tiendanube** con un botón en `/tiendanube` (§19). **Falta que el usuario la corra.**
+
+**Pedidos**
+- **Promo bancaria** opcional al pasar a Compró y en "Datos del pedido": BNA, Provincia, Naranja, BBVA, Galicia (§18).
+
+**Objetivos del mes** (barra arriba de todas las páginas; carga en Equipo, solo admin)
+- **Qué cuenta, con Tiendanube conectada** (§13, la regla final, que reemplaza a §10, §11 y §12):
+  - solo pedidos **pagados y no cancelados** con **"off/Nombre" en las notas** del pedido (`owner_note` / `note`), por ejemplo `off/fabricio/wsp / comp ICBC`;
+  - se toman por fecha de pago;
+  - el vendedor sale **solo** del nombre de la marca ("Mariano" → Marian, "fabri" → Fabricio). Si el nombre no es de nadie del equipo, queda "sin asignar".
+  - **No** cuentan las tarjetas del CRM.
+- **Sin Tiendanube o si falla:** cuentan las tarjetas que pasaron a Compró en el mes.
+- **Tiendanube:** está **conectada en producción**. El usuario confirmó que los números ahora dan bien. `/tiendanube` tiene la revisión pedido por pedido.
+- **Ritmo por día** (§14): necesario = objetivo / días del mes; promedio = vendido / días transcurridos, hoy incluido.
+  - Verde ≥100%, amarillo ≥80%, rojo <80%.
+  - Se ve en el equipo, en cada vendedor y en "Vos".
+- **Fondo de todo el CRM** con el color del ritmo **del equipo** (§15):
+  - verde `emerald-50`, amarillo `amber-200`, rojo `rose-200`;
+  - el usuario pidió más intensos el amarillo y el rojo.
+- **Acumulado a la fecha** (§16): "deberíamos llevar / llevamos (+/−)", en el equipo y en cada vendedor.
+- "Faltan N días" cuenta hoy (el 5/10 dice 27).
+- **Fotito (emoji) de cada vendedor** (§17): Fabricio 👶, Marian 🥸, Bruno 🐺. Se edita en Equipo.
+- **Actualización:**
+  - la barra se recalcula al recargar o al guardar algo;
+  - los pedidos de Tiendanube se cachean 10 minutos.
+
+### Variables de entorno en Vercel (solo servidor)
+- `TIENDANUBE_APP_ID` (45055), `TIENDANUBE_CLIENT_SECRET`, `TIENDANUBE_STORE_ID` y `TIENDANUBE_TOKEN`. Ya están cargadas: la tienda funciona.
+- Opcional: `TIENDANUBE_OFF_ORIGINS`.
+- `TIENDANUBE_API_URL` es **solo para pruebas** con un mock.
+
+### Pendientes
+1. **El usuario tiene que correr la importación de clientes de Tiendanube** (§19). Si aparecen errores, ver la captura que mande.
+2. **Seguridad:** el `client_secret` de Tiendanube apareció en una captura del chat. Se le recomendó generar uno nuevo y reemplazarlo en Vercel. No está confirmado si invalida el token actual: hay que verificarlo antes.
+3. **Unificar tarjetas con historial de compras (productos con talle)**, frenado (§8):
+   - están traídas 25 de 2.208 compras de ClickUp en `imp.cerrados_info`;
+   - se espera un CSV de ClickUp **con las tareas cerradas**, o un "seguí" para seguir de a una;
+   - sigue sin respuesta si un "Nuevo pedido" para un cliente con tarjeta debe reusar esa tarjeta.
+4. **Sin respuesta:** ¿renombrar en ClickUp el estado "cerrado" a "Compró"?
+5. **Opcionales:**
+   - README desactualizado;
+   - borrar `public.clickup_import` y el schema `imp` (ojo: `imp.cerrados_info` se usa para el punto 3);
+   - la columna "Hablar de nuevo", que está vacía;
+   - una búsqueda en el servidor para las columnas finales.
+
+### Cómo probar localmente (el contenedor se reinicia seguido)
+- `bash /var/tmp/e2e/up-off.sh` levanta todo, si `/var/tmp/e2e` sigue existiendo: postgres, la base con todas las migraciones, PostgREST, el gateway, el Tiendanube de mentira (`tnmock.mjs`, puerto 4010), Next y datos de ejemplo.
+- Esos scripts **no están en el repo**. Si se perdieron, ver `HANDOFF.md` §8 para rearmarlos.
+- **Trampas:**
+  - después de agregar una columna, correr `notify pgrst, 'reload schema'`;
+  - borrar `.next/cache/fetch-cache` al cambiar el mock;
+  - `pkill -f` con un patrón que aparezca en la misma línea de comando mata al propio shell;
+  - en Playwright, esperar a que la página esté hidratada antes de elegir opciones en un `<select>`.
 
 ---
 
@@ -179,7 +264,7 @@ El usuario quiere ver todos esos contactos en el tablero.
 
 ---
 
-## 5. Pendientes y preguntas abiertas
+## 5. Pendientes y preguntas abiertas (de ese momento; los vigentes están en "Estado actual")
 
 - **Sin respuesta del usuario:** ¿cambiar también en **ClickUp** el nombre del estado "cerrado" por "Compró"? (En el CRM ya se llama Compró.)
 - **Confirmar** que la publicación del PR #12 en Vercel terminó bien. No se pudo ver desde el contenedor: el proxy bloquea vercel.app.
@@ -269,7 +354,7 @@ El usuario quiere ver todos esos contactos en el tablero.
   - el tablero sigue entrando en 900px.
 
 
-## 10. PR #17 (5/10): ventas de la tienda online (Tiendanube) en el objetivo
+## 10. PR #17 (5/10): ventas de la tienda online (Tiendanube) en el objetivo — reemplazado por §13
 
 - **Pedido del usuario:** que el objetivo cuente las ventas de la tienda y no solo lo cargado en el CRM.
 - **Decisiones del usuario:**
@@ -306,7 +391,7 @@ El usuario quiere ver todos esos contactos en el tablero.
 - **Estado:** el usuario tiene que crear la app en Tiendanube y cargar las variables. Todavía **no está conectada**.
 
 
-## 11. PR #18 (5/10): los objetivos cuentan solo las ventas off de Tiendanube
+## 11. PR #18 (5/10): los objetivos cuentan solo las ventas off de Tiendanube — reemplazado por §13
 
 - **Qué pidió el usuario**, corrigiendo el §10: "para el CRM, que tome las ventas de off" (eligió *pedidos manuales en Tiendanube*), y "lo mismo para los vendedores".
 - **Regla nueva**, con Tiendanube conectada:
@@ -335,7 +420,7 @@ El usuario quiere ver todos esos contactos en el tablero.
   - El `client_secret` quedó visible en una captura del chat: se le recomendó regenerarlo después de conectar.
 
 
-## 12. PR #19 (5/10): marca "OFF/Nombre"
+## 12. PR #19 (5/10): marca "OFF/Nombre" — ajustado en §13
 
 - **Cómo marcan los chicos sus ventas en Tiendanube:** "OFF/Mariano", "OFF/Fabricio", etc.
 - **Regla `OFF_MARK`** (`/\bOFF\s*[\/|\-]\s*(nombre)/i`): se busca en `owner_note`, `note`, `customer.name`, `contact_name` y `billing_name`.
