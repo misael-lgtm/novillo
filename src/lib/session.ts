@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { AS_COOKIE, createClient } from "./supabase/server";
 import type { TeamMember } from "./types";
 
-const MEMBER_COLS = "email, name, is_admin, active, login_email";
+const MEMBER_COLS = "email, name, is_admin, active, login_email, avatar";
 
 /**
  * Las personas que pueden usar este login: una sola si entra con su mail,

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addMember, saveGoals, setMemberActive } from "@/app/actions";
+import { addMember, saveGoals, setMemberActive, setMemberAvatar } from "@/app/actions";
 import { formatMoney } from "@/lib/rules";
 import { Field, ResultBanner, SubmitButton, fieldError, useFormAction } from "./ui";
 
@@ -134,5 +134,34 @@ export function GoalsForm({
         Guardar objetivos
       </SubmitButton>
     </form>
+  );
+}
+
+/** "Fotito" de cada persona: un emoji que se ve al lado de su nombre en los objetivos. */
+export function AvatarInput({ email, avatar }: { email: string; avatar: string | null }) {
+  const [value, setValue] = useState(avatar ?? "");
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  function save() {
+    if (value === (avatar ?? "")) return;
+    start(async () => {
+      const r = await setMemberAvatar(email, value);
+      setError(r.ok ? null : r.error);
+    });
+  }
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+        aria-label="Fotito (emoji)"
+        title="Fotito: pegá un emoji (ej. 👶 🐺 🥸). Se ve al lado del nombre en los objetivos."
+        placeholder="🙂"
+        className={`w-12 rounded-lg border border-stone-300 bg-white px-1 py-1 text-center text-xl ${pending ? "opacity-50" : ""}`}
+      />
+      {error && <span className="text-xs text-rose-700">{error}</span>}
+    </span>
   );
 }

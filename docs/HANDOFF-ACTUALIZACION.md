@@ -405,3 +405,21 @@ El usuario quiere ver todos esos contactos en el tablero.
   - en el equipo: "Acumulado al día N: deberíamos llevar $X · llevamos $Y (+/−$Z)", en una segunda línea dentro del `summary`;
   - en cada vendedor: "debería llevar / lleva", debajo de "$/día · necesita $/día".
   - La diferencia sale en verde si es positiva y en rojo si es negativa.
+
+
+## 17. PR #26 (5/10): "fotito" de cada vendedor
+
+- **Pedido del usuario:** una fotito al lado de cada vendedor en los objetivos.
+- **Por qué emoji:** para "Freddie Mercury" no se usa una foto real (derechos de imagen), así que se usan emojis.
+- **Migración `0007_member_avatar.sql`:** `team_members.avatar` (texto, hasta 16 caracteres). **Ya aplicada en producción**, con estos valores:
+
+| Vendedor | Avatar |
+|---|---|
+| Fabricio | 👶 |
+| Marian | 🥸 (carita con bigotes, la pidió el usuario) |
+| Bruno | 🐺 |
+
+- **Dónde se ve:** en la lista por vendedor de la barra de objetivos (al lado del punto de color) y en el chip "Vos".
+- **Cómo se cambia:** el admin la edita en **Equipo**, en el cuadradito a la izquierda de cada persona. Se pega un emoji y se guarda al salir del campo (`setMemberAvatar`).
+- `MEMBER_COLS` incluye `avatar` y el tipo `TeamMember.avatar` también.
+- **Para probar en local:** después de agregar una columna hay que avisarle a PostgREST con `notify pgrst, 'reload schema'`.

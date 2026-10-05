@@ -667,6 +667,18 @@ export async function addMember(_prev: unknown, fd: FormData): Promise<ActionRes
   return { ok: true, message: `${name} ya puede entrar ✔` };
 }
 
+/** Cambiar la "fotito" (emoji) de alguien del equipo. Vacío = sin fotito. */
+export async function setMemberAvatar(email: string, avatar: string): Promise<ActionResult> {
+  const { supabase, me } = await requireMember();
+  if (!me.is_admin) return { ok: false, error: "Solo un admin puede hacer esto." };
+  const value = avatar.trim() || null;
+  if (value && [...value].length > 8) return { ok: false, error: "Poné solo un emoji." };
+  const { error } = await supabase.from("team_members").update({ avatar: value }).eq("email", email);
+  if (error) return { ok: false, error: friendly(error) };
+  refresh();
+  return { ok: true };
+}
+
 export async function setMemberActive(email: string, active: boolean): Promise<ActionResult> {
   const { supabase, me } = await requireMember();
   if (!me.is_admin) return { ok: false, error: "Solo un admin puede hacer esto." };

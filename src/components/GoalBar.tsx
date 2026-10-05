@@ -48,7 +48,7 @@ export async function GoalBar() {
           {teamPace && <PaceChip status={teamPace.status} perDay={teamPace.perDay} needPerDay={teamPace.needPerDay} />}
           {mine && (
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${minePace ? PACE[minePace.status].chip : "bg-stone-100"}`}>
-              {minePace ? PACE[minePace.status].dot : ""} Vos: {percent(mine)}%
+              {minePace ? PACE[minePace.status].dot : ""} {mine.avatar ? `${mine.avatar} ` : ""}Vos: {percent(mine)}%
             </span>
           )}
           {(withGoal.length > 0 || store) && (
@@ -82,7 +82,13 @@ export async function GoalBar() {
                 <li key={x.scope} className="space-y-1">
                   <div className="flex items-baseline justify-between gap-2 text-sm">
                     <span className={`font-semibold ${x.scope === me.email ? "underline" : ""}`}>
-                      {p && PACE[p.status].dot} {x.name}
+                      {p && PACE[p.status].dot}{" "}
+                      {x.avatar && (
+                        <span className="text-lg leading-none" aria-hidden>
+                          {x.avatar}
+                        </span>
+                      )}{" "}
+                      {x.name}
                     </span>
                     <span className="text-xs text-stone-500">
                       {formatMoney(x.total)} de {formatMoney(x.goal)} · <b className="text-stone-900">{percent(x)}%</b>
