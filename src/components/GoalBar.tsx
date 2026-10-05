@@ -9,7 +9,7 @@ export async function GoalBar() {
   const team = await getTeam();
   const today = todayAR();
   const month = monthStart(today);
-  const { team: total, members, store, crm } = await getGoalSummary(supabase, team, month);
+  const { team: total, members, store, crm, unassigned } = await getGoalSummary(supabase, team, month);
 
   if (!total.goal) {
     if (!me.is_admin) return null;
@@ -54,9 +54,14 @@ export async function GoalBar() {
           <p className="mt-3 border-t border-stone-100 pt-3 text-xs text-stone-500">
             {store.ok ? (
               <>
-                Incluye la tienda online: <b className="text-stone-900">{formatMoney(store.total)}</b> ({store.ventas}{" "}
-                {store.ventas === 1 ? "pedido pagado" : "pedidos pagados"}) + lo cargado en el CRM. Las tarjetas con canal “Tienda online”
-                no se cuentan dos veces.
+                Cuenta las <b className="text-stone-900">ventas off de Tiendanube</b> (pedidos manuales pagados), no las compras en la web.
+                {unassigned && unassigned.ventas > 0 && (
+                  <>
+                    {" "}
+                    Sin vendedor asignado: <b className="text-stone-900">{formatMoney(unassigned.total)}</b> ({unassigned.ventas}{" "}
+                    {unassigned.ventas === 1 ? "pedido" : "pedidos"}) — para que sume a alguien, poné su nombre en la nota del pedido en Tiendanube.
+                  </>
+                )}
               </>
             ) : (
               <>⚠️ No se pudo leer la tienda online ({store.error}): por ahora solo cuenta lo cargado en el CRM ({formatMoney(crm.total)}).</>

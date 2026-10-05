@@ -41,7 +41,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
             <b>sin conectar</b>
           ) : goals.store.ok ? (
             <>
-              <b>conectada</b> · este mes {formatMoney(goals.store.total)} ({goals.store.ventas} pedidos)
+              <b>conectada</b> · ventas off del mes {formatMoney(goals.team.total)} ({goals.team.ventas} pedidos)
             </>
           ) : (
             <b className="text-rose-700">con error</b>
