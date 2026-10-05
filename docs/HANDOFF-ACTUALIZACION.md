@@ -198,3 +198,42 @@ El usuario quiere ver todos esos contactos en el tablero.
 - Pide cosas cortas y a veces ambiguas ("seleccionar toda la lista", "sigo sin verlo"). Una captura suele aclarar más que preguntar.
 - Antes de cambios grandes en datos de producción, mostrar los números ("son 134, ninguna compra") y hacerlo de forma reversible: archivar, nunca borrar.
 - No guardar la contraseña de la base que haya pegado el usuario. No poner la anon key en el código.
+
+
+---
+
+## 7. PR #14 (5/10): notas en la tarjeta del tablero
+
+- **Pedido del usuario:** "que puedan escribir en la tarjeta los chicos".
+- **Botón "✏️ Nota"** en cada tarjeta (al lado de "Pasar a…"). Abre un textarea en la misma tarjeta.
+  - Enter guarda, Shift+Enter hace un salto de línea y Esc cancela.
+  - Los botones y el textarea frenan el `pointerdown` y el `touchstart`, así no arrancan un arrastre.
+- **Cómo se ve la nota:** la tarjeta muestra la **última nota** en un recuadro ámbar: "💬 texto — Quién, hace N días".
+- **Server action:** `addCardNote(orderId, message)` envuelve a `addNote`, así que la nota queda en `activity_log` como `kind='note'`, igual que en la página del pedido.
+- **Migración `0004_card_notes.sql`** (ya aplicada en producción con `apply_migration` y verificada):
+  - columnas nuevas `orders.last_note`, `last_note_at` y `last_note_by`;
+  - trigger `activity_last_note`, que copia ahí cada nota nueva de un pedido, venga de la tarjeta o de la página del pedido, salvo las "Importado de ClickUp…";
+  - `log_changes()` ignora esas columnas para no ensuciar el historial;
+  - se rellenaron las notas que ya había (6 pedidos).
+- **Probado con Playwright local:**
+  - escribir y guardar, y que siga al recargar;
+  - una nota escrita en la página del pedido también aparece en la tarjeta;
+  - el historial no suma entradas "updated";
+  - arrastrar sigue funcionando.
+
+## 8. Unificar tarjetas con historial de compras (EN CURSO, frenado)
+
+- **Pedido del usuario:** una tarjeta por cliente, con una descripción que diga qué productos compró (con talles) y cuánto lleva vendido.
+- **Lo que hay:**
+  - Ya hay una tarjeta activa por cliente (ver §1.2).
+  - Las compras importadas de ClickUp dicen solo "Compra importada de ClickUp".
+  - El producto y el talle están en cada tarea de ClickUp: en `text_content` (por ejemplo "perth L") y en los custom fields "Informacion de contacto" (familia, por ejemplo "alaska" o "glasgow") y "Modelo del producto".
+  - El listado de ClickUp (`filter_tasks`) **no** trae la descripción. Hay que pedir las tareas de a una con `clickup_get_task` e `include: ["custom_fields"]`, y no hay operador en lote.
+- **Montos:** ClickUp **no tiene montos**. El "total vendido" solo puede salir de lo cargado en el CRM. Se le avisó al usuario.
+- **Avance:**
+  - Tabla `imp.cerrados_info(task_id, ref, info, modelo, contenido)` con **25 de 2.208** compras.
+  - Las pendientes salen con: `imp.cerrados c join orders o on o.source_ref=c.ref and o.source='clickup' where not exists (select 1 from imp.cerrados_info i where i.task_id=c.task_id)`.
+- **Esperando al usuario:**
+  - que exporte de ClickUp un CSV **con las tareas cerradas incluidas**. El CSV de antes (`public.clickup_import`) no tiene ninguna cerrada;
+  - o que diga "seguí" para seguir de a una (unas 2 a 3 horas).
+- **Sin respuesta:** si al cargar un "Nuevo pedido" para un cliente con tarjeta se reusa esa tarjeta en vez de crear otra.
