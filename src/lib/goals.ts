@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normalizePhoneAR, todayAR } from "./rules";
+import { todayAR } from "./rules";
 import { storeSalesForMonth, type TnSale } from "./tiendanube";
 import type { TeamMember } from "./types";
 
@@ -22,68 +22,28 @@ type Tally = { total: number; ventas: number };
 const fold = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 /**
- * A qué vendedor va cada venta off de Tiendanube:
- * 1) "OFF/Mariano" → Marian (el nombre se compara por el principio: Mariano/Marian, Fabri/Fabricio);
- * 2) si no, si la nota del pedido nombra a alguien del equipo, a esa persona;
- * 3) si no, al vendedor de la tarjeta del cliente con ese celular o mail en el CRM;
- * 4) si no, queda "sin asignar" (suma solo al equipo).
+ * A qué vendedor va cada venta off de Tiendanube: al nombre que dice "off/…" en la nota
+ * ("off/Mariano" → Marian, "off/fabri" → Fabricio: se compara el principio, sin tildes).
+ * Si el nombre no es de nadie del equipo, queda "sin asignar" (suma solo al equipo), nunca a otro vendedor.
  */
-async function attributeStoreSales(supabase: SupabaseClient, team: TeamMember[], sales: TnSale[]) {
+export async function attributeStoreSales(_supabase: SupabaseClient, team: TeamMember[], sales: TnSale[]) {
   const bySeller = new Map<string, Tally>();
   const unassigned: Tally = { total: 0, ventas: 0 };
-  const add = (t: Tally, total: number) => {
-    t.total += total;
-    t.ventas += 1;
-  };
-
-  const names = team
-    .map((m) => ({ email: m.email, re: new RegExp(`\\b${fold(m.name.split(" ")[0]).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`) }))
-    .filter((n) => n.re.source.length > 6);
+  const sellerOf = new Map<number, string | null>();
   const firsts = team.map((m) => ({ email: m.email, first: fold(m.name.split(" ")[0]) }));
   const byOffName = (name: string | null) => {
     if (!name) return null;
     const n = fold(name);
-    const hit = firsts.find((m) => Math.min(m.first.length, n.length) >= 4 && (m.first.startsWith(n) || n.startsWith(m.first)));
-    return hit?.email ?? null;
+    return firsts.find((m) => Math.min(m.first.length, n.length) >= 4 && (m.first.startsWith(n) || n.startsWith(m.first)))?.email ?? null;
   };
-  const byNote = (x: TnSale) => byOffName(x.offName) ?? names.find((n) => n.re.test(fold(x.note)))?.email ?? null;
-
-  // Clientes del CRM con esos celulares / mails, y el vendedor de su tarjeta más reciente.
-  const pending = sales.filter((x) => !byNote(x));
-  const phones = [...new Set(pending.map((x) => normalizePhoneAR(x.phone)).filter((p): p is string => !!p))];
-  const emails = [...new Set(pending.map((x) => x.email).filter((e): e is string => !!e))];
-  const sellerOfCustomer = new Map<string, string>();
-  if (phones.length || emails.length) {
-    const ors = [
-      ...(phones.length ? [`phone.in.(${phones.join(",")})`] : []),
-      ...(emails.length ? [`email.in.(${emails.map((e) => `"${e.replace(/"/g, "")}"`).join(",")})`] : []),
-    ].join(",");
-    const { data } = await supabase
-      .from("customers")
-      .select("phone, email, orders(assigned_to, archived_at, stage_changed_at)")
-      .or(ors)
-      .returns<{ phone: string | null; email: string | null; orders: { assigned_to: string; archived_at: string | null; stage_changed_at: string }[] }[]>();
-    for (const c of data ?? []) {
-      const card = [...c.orders].sort(
-        (a, b) => Number(!!a.archived_at) - Number(!!b.archived_at) || b.stage_changed_at.localeCompare(a.stage_changed_at),
-      )[0];
-      if (!card) continue;
-      if (c.phone) sellerOfCustomer.set(`p:${c.phone}`, card.assigned_to);
-      if (c.email) sellerOfCustomer.set(`e:${c.email.toLowerCase()}`, card.assigned_to);
-    }
-  }
-
   for (const x of sales) {
-    const phone = normalizePhoneAR(x.phone);
-    const seller =
-      byNote(x) ?? (phone && sellerOfCustomer.get(`p:${phone}`)) ?? (x.email && sellerOfCustomer.get(`e:${x.email}`)) ?? null;
-    if (!seller) add(unassigned, x.total);
-    else {
-      if (!bySeller.has(seller)) bySeller.set(seller, { total: 0, ventas: 0 });
-      add(bySeller.get(seller)!, x.total);
-    }
+    const seller = byOffName(x.offName);
+    sellerOf.set(x.id, seller);
+    const t = seller ? (bySeller.get(seller) ?? bySeller.set(seller, { total: 0, ventas: 0 }).get(seller)!) : unassigned;
+    t.total += x.total;
+    t.ventas += 1;
   }
-  return { bySeller, unassigned };
+  return { bySeller, unassigned, sellerOf };
 }
 
 /**

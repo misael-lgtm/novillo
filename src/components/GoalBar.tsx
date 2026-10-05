@@ -54,12 +54,12 @@ export async function GoalBar() {
           <p className="mt-3 border-t border-stone-100 pt-3 text-xs text-stone-500">
             {store.ok ? (
               <>
-                Cuenta las <b className="text-stone-900">ventas off de Tiendanube</b> (pedidos manuales pagados), no las compras en la web.
+                Cuenta las <b className="text-stone-900">ventas off de Tiendanube</b>: pedidos pagados con “off/Nombre” en las notas.
                 {unassigned && unassigned.ventas > 0 && (
                   <>
                     {" "}
                     Sin vendedor asignado: <b className="text-stone-900">{formatMoney(unassigned.total)}</b> ({unassigned.ventas}{" "}
-                    {unassigned.ventas === 1 ? "pedido" : "pedidos"}) — para que sume a alguien, cargalo en Tiendanube como “OFF/Nombre”.
+                    {unassigned.ventas === 1 ? "pedido" : "pedidos"}) — el nombre después de “off/” no es de nadie del equipo. Mirá el detalle en Equipo → Tienda online.
                   </>
                 )}
               </>
