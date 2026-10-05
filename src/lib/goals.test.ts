@@ -22,5 +22,11 @@ describe("pace", () => {
     expect(p.needPerDay).toBe(1_000_000);
     expect(p.perDay).toBe(900_000);
   });
+  it("acumulado: cuánto deberían llevar a hoy y la diferencia", () => {
+    const p = pace(line(31_000_000, 9_000_000), "2026-10-10")!;
+    expect(p.expected).toBe(10_000_000);
+    expect(p.diff).toBe(-1_000_000);
+    expect(p.day).toBe(10);
+  });
   it("sin objetivo no hay ritmo", () => expect(pace(line(null, 5), "2026-10-10")).toBeNull());
 });

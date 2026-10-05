@@ -54,6 +54,7 @@ export async function GoalBar() {
           {(withGoal.length > 0 || store) && (
             <span className="text-xs text-stone-500 underline group-open:hidden">Ver detalle</span>
           )}
+          {teamPace && <Accumulated expected={teamPace.expected} actual={total.total} day={teamPace.day} we className="basis-full" />}
         </summary>
         {store && (
           <p className="mt-3 border-t border-stone-100 pt-3 text-xs text-stone-500">
@@ -89,9 +90,12 @@ export async function GoalBar() {
                   </div>
                   <Progress line={x} status={p?.status} />
                   {p && (
-                    <p className="text-xs text-stone-500">
-                      {formatMoney(Math.round(p.perDay))}/día · necesita {formatMoney(Math.round(p.needPerDay))}/día
-                    </p>
+                    <>
+                      <p className="text-xs text-stone-500">
+                        {formatMoney(Math.round(p.perDay))}/día · necesita {formatMoney(Math.round(p.needPerDay))}/día
+                      </p>
+                      <Accumulated expected={p.expected} actual={x.total} day={p.day} />
+                    </>
                   )}
                 </li>
               );
@@ -118,6 +122,21 @@ function PaceChip({ status, perDay, needPerDay }: { status: PaceStatus; perDay: 
     >
       {PACE[status].dot} {PACE[status].label} · {formatMoney(Math.round(perDay))}/día de {formatMoney(Math.round(needPerDay))}
     </span>
+  );
+}
+
+/** Acumulado a hoy: cuánto deberían llevar, cuánto llevan y la diferencia. */
+function Accumulated({ expected, actual, day, we = false, className = "" }: { expected: number; actual: number; day: number; we?: boolean; className?: string }) {
+  const diff = Math.round(actual - expected);
+  return (
+    <p className={`text-xs text-stone-600 ${className}`}>
+      Acumulado al día {day}: {we ? "deberíamos llevar" : "debería llevar"} <b className="text-stone-900">{formatMoney(Math.round(expected))}</b> ·{" "}
+      {we ? "llevamos" : "lleva"} <b className="text-stone-900">{formatMoney(Math.round(actual))}</b>{" "}
+      <b className={diff >= 0 ? "text-emerald-700" : "text-rose-700"}>
+        ({diff >= 0 ? "+" : "−"}
+        {formatMoney(Math.abs(diff))})
+      </b>
+    </p>
   );
 }
 
