@@ -243,7 +243,7 @@ El usuario quiere ver todos esos contactos en el tablero.
 
 - **Pedido del usuario:** "un contador de cómo venimos con el objetivo arriba del CRM y uno por vendedor; yo cargo manual por mes".
 - **Barra arriba de todas las páginas** (`src/components/GoalBar.tsx`, en `(app)/layout.tsx` debajo del `Nav`):
-  - Muestra "🎯 Objetivo de octubre de 2026", una barra de progreso, "$ X de $ Y · N% · K ventas · faltan D días" y "Vos: N%" si el que mira tiene objetivo.
+  - Muestra "🎯 Objetivo de octubre de 2026", una barra de progreso, "$ X de $ Y · N% · K ventas · faltan D días (hoy cuenta: el 5/10 faltan 27; el último día dice "último día")" y "Vos: N%" si el que mira tiene objetivo.
   - Es un `<details>`: al tocarlo se abre la lista por vendedor con su barra (verde cuando llega al 100%).
   - Si el mes no tiene objetivo, el admin ve un aviso con link a `/equipo#objetivos` y los demás no ven nada.
 - **Carga** (`GoalsForm` en `src/components/Team.tsx`, en `/equipo`, solo admin):
