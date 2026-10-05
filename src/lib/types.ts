@@ -37,6 +37,8 @@ export type Order = {
   description: string;
   total: number | null;
   payment_method: string | null;
+  /** Promo bancaria (opcional): bna, provincia, naranja, bbva, galicia. */
+  bank_promo: string | null;
   shipping_address: string | null;
   carrier: string | null;
   tracking_code: string | null;

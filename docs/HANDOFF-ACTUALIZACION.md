@@ -423,3 +423,17 @@ El usuario quiere ver todos esos contactos en el tablero.
 - **Cómo se cambia:** el admin la edita en **Equipo**, en el cuadradito a la izquierda de cada persona. Se pega un emoji y se guarda al salir del campo (`setMemberAvatar`).
 - `MEMBER_COLS` incluye `avatar` y el tipo `TeamMember.avatar` también.
 - **Para probar en local:** después de agregar una columna hay que avisarle a PostgREST con `notify pgrst, 'reload schema'`.
+
+
+## 18. PR #27 (5/10): promo bancaria opcional
+
+- **Pedido del usuario:** al pasar a Compró, además de Mercado Pago / Transferencia, botones Promo BNA / Provincia / Naranja / BBVA / Galicia, **no obligatorios**.
+- **Migración `0008_bank_promo.sql`:** `orders.bank_promo` (`bna|provincia|naranja|bbva|galicia`, o null). **Ya aplicada en producción.**
+- **`config.ts`:** `BANK_PROMOS`, `BANK_PROMO_IDS` y `bankPromoLabel()`.
+- **`rules.ts`:** `OrderFields.bank_promo` existe pero está fuera de `RequiredField`, así que nunca se exige.
+- **`readOrderFields`** lee `bank_promo`; lo usan `moveOrder` y `updateOrder`.
+- **Dónde se elige:**
+  - `StageMoveDialog`: debajo del medio de pago aparece "Promo bancaria (opcional)", con "Sin promo" elegido por defecto. `RadioGroup` tiene la opción `optional` para esto.
+  - `OrderEditForm`: un select "Promo bancaria" para ponerla o cambiarla después.
+- **Historial (`Timeline`):** muestra "la promo bancaria" con su nombre.
+- **Limitación:** si la tarjeta ya tiene monto y medio de pago, pasarla a Compró no abre el diálogo, así que la promo se elige desde la página del pedido. Lo mismo al mover en lote.

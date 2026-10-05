@@ -152,6 +152,17 @@ export const PAYMENT_METHOD_IDS = PAYMENT_METHODS.map((p) => p.id) as [
   ...PaymentMethodId[],
 ];
 
+/** Promo bancaria con la que pagó (opcional, se elige al pasar a Compró). */
+export const BANK_PROMOS = [
+  { id: "bna", label: "Promo BNA" },
+  { id: "provincia", label: "Promo Provincia" },
+  { id: "naranja", label: "Promo Naranja" },
+  { id: "bbva", label: "Promo BBVA" },
+  { id: "galicia", label: "Promo Galicia" },
+] as const;
+export type BankPromoId = (typeof BANK_PROMOS)[number]["id"];
+export const BANK_PROMO_IDS = BANK_PROMOS.map((p) => p.id) as [BankPromoId, ...BankPromoId[]];
+
 export const CARRIERS = [
   { id: "correo_argentino", label: "Correo Argentino", trackingUrl: "https://www.correoargentino.com.ar/formularios/e-commerce?id=" },
   { id: "andreani", label: "Andreani", trackingUrl: "https://www.andreani.com/#!/informacionEnvio/" },
@@ -168,6 +179,9 @@ export function channelLabel(id: string) {
 }
 export function paymentLabel(id: string | null) {
   return PAYMENT_METHODS.find((p) => p.id === id)?.label ?? "—";
+}
+export function bankPromoLabel(id: string | null) {
+  return BANK_PROMOS.find((p) => p.id === id)?.label ?? "Sin promo";
 }
 export function carrierLabel(id: string | null) {
   return CARRIERS.find((c) => c.id === id)?.label ?? "—";
