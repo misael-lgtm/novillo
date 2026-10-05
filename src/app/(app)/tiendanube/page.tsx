@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { monthLabel, monthStart } from "@/lib/goals";
 import { formatMoney } from "@/lib/rules";
 import { requireMember } from "@/lib/session";
-import { exchangeCode, isConnected, storeSalesForMonth, tiendanube } from "@/lib/tiendanube";
+import { OFF_ORIGINS, ORIGIN_LABELS, exchangeCode, isConnected, storeSalesForMonth, tiendanube } from "@/lib/tiendanube";
 
 const REDIRECT = "https://wayfarer-crm.vercel.app/tiendanube";
 
@@ -50,18 +50,40 @@ export default async function TiendanubePage({ searchParams }: { searchParams: P
       <div>
         <h1 className="text-2xl font-bold">Tienda online</h1>
         <p className="text-sm text-stone-500">
-          Con la tienda conectada, los pedidos pagados en Tiendanube suman al objetivo del equipo (no al de cada vendedor). Las tarjetas del CRM con canal
-          “Tienda online” no se cuentan dos veces.
+          Con la tienda conectada, los objetivos cuentan las <b>ventas off</b>: los pedidos que los chicos cargan a mano en Tiendanube (no las compras que la
+          gente hace sola en la web). Cada una suma al equipo y al vendedor que la hizo.
         </p>
       </div>
 
       {sales ? (
         <div className="card p-5">
           {sales.ok ? (
-            <p>
-              ✔ <b>Conectada.</b> En {monthLabel(month)} la tienda lleva <b>{formatMoney(sales.total)}</b> en {sales.ventas}{" "}
-              {sales.ventas === 1 ? "pedido pagado" : "pedidos pagados"}.
-            </p>
+            <div className="space-y-3">
+              <p>
+                ✔ <b>Conectada.</b> Pedidos pagados de {monthLabel(month)} según de dónde vienen. Para los objetivos cuentan solo los
+                marcados con ✔ (ventas off).
+              </p>
+              <ul className="divide-y divide-stone-100 text-sm">
+                {Object.entries(sales.byOrigin)
+                  .sort((a, b) => b[1].total - a[1].total)
+                  .map(([origin, t]) => (
+                    <li key={origin} className="flex justify-between gap-3 py-2">
+                      <span>
+                        {OFF_ORIGINS.includes(origin) ? "✔ " : "— "}
+                        {ORIGIN_LABELS[origin] ?? origin} <span className="text-xs text-stone-500">({origin})</span>
+                      </span>
+                      <span>
+                        {formatMoney(t.total)} · {t.ventas} {t.ventas === 1 ? "pedido" : "pedidos"}
+                      </span>
+                    </li>
+                  ))}
+                {Object.keys(sales.byOrigin).length === 0 && <li className="py-2 text-stone-500">Todavía no hay pedidos pagados este mes.</li>}
+              </ul>
+              <p className="text-xs text-stone-500">
+                Cada venta off va al vendedor cuyo nombre esté en la nota del pedido; si no, al vendedor de la tarjeta del cliente (mismo celular o mail);
+                si no, queda sin asignar y suma solo al equipo.
+              </p>
+            </div>
           ) : (
             <p className="text-rose-800">⚠️ Está configurada pero no se pudo leer: {sales.error}. Revisá el token o autorizá de nuevo (paso 3).</p>
           )}

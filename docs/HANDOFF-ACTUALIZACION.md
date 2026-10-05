@@ -304,3 +304,32 @@ El usuario quiere ver todos esos contactos en el tablero.
   - con token malo cae a solo CRM y avisa;
   - sin conectar, muestra el paso a paso.
 - **Estado:** el usuario tiene que crear la app en Tiendanube y cargar las variables. Todavía **no está conectada**.
+
+
+## 11. PR #18 (5/10): los objetivos cuentan solo las ventas off de Tiendanube
+
+- **Qué pidió el usuario**, corrigiendo el §10: "para el CRM, que tome las ventas de off" (eligió *pedidos manuales en Tiendanube*), y "lo mismo para los vendedores".
+- **Regla nueva**, con Tiendanube conectada:
+  - **Equipo** = suma de los pedidos pagados del mes con `storefront` en `OFF_ORIGINS` (por defecto `form`, los pedidos manuales), sin cancelados.
+  - **No cuentan:** las compras en la web (`store`) y **tampoco las tarjetas del CRM**.
+  - **Cada vendedor**, en este orden:
+    1. su nombre (el primer nombre, sin importar tildes ni mayúsculas) aparece en `owner_note`/`note` del pedido;
+    2. si no, el celular (`contact_phone`/`customer.phone`, normalizado) o el mail del pedido coincide con un cliente del CRM, y va al `assigned_to` de su tarjeta más reciente no archivada;
+    3. si no, queda "sin asignar": suma solo al equipo y la barra lo muestra con la sugerencia de poner el nombre en la nota.
+  - **Sin Tiendanube** (o si falla): todo sigue como antes, con Compró del CRM.
+- **`TIENDANUBE_OFF_ORIGINS`** (variable de entorno opcional, ej. `form,pos`) permite cambiar qué orígenes cuentan **sin tocar código**.
+  - Ojo: que los pedidos manuales tengan `storefront='form'` es lo que se sabe de la API, pero **no está verificado con la tienda real**.
+  - `/tiendanube` muestra los pedidos pagados del mes **por origen**, con ✔ en los que cuentan. Con eso se confirma o corrige.
+- **Código:**
+  - `storeSalesForMonth` devuelve `{ off: TnSale[], byOrigin }`.
+  - La asignación está en `attributeStoreSales` (`src/lib/goals.ts`).
+  - `getGoalSummary` devuelve también `unassigned`.
+- `month_sales_tienda` (migración 0006) **ya no se usa**. Se dejó en la base: no molesta.
+- **Probado con Playwright y el Tiendanube de mentira:**
+  - una compra web, tres manuales (una con "Marián" en la nota, una con el celular de un cliente de Bruno y una sin datos) y una cancelada;
+  - resultado: equipo $160.000 (16%), Marian 10%, Bruno 80% y $30.000 sin asignar;
+  - la venta de Misael cargada solo en el CRM ya no cuenta;
+  - `/tiendanube` muestra el detalle por origen.
+- **Estado:** el usuario estaba conectando la tienda. Tiendanube le mostró un `curl` con el `code` en vez de redirigir.
+  - Se le indicó abrir `https://wayfarer-crm.vercel.app/tiendanube?code=…` dentro de los 5 minutos, con APP_ID y CLIENT_SECRET ya cargados en Vercel.
+  - El `client_secret` quedó visible en una captura del chat: se le recomendó regenerarlo después de conectar.
