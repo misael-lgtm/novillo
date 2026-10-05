@@ -365,3 +365,19 @@ El usuario quiere ver todos esos contactos en el tablero.
 - **`OFF_ORIGINS`:** ahora solo sirve para listar en la revisión los manuales sin marca; no los cuenta.
 - **Cache:** `storeSalesForMonth` usa la caché de fetch de Next (10 minutos). En desarrollo local hay que borrar `.next/cache/fetch-cache` al cambiar el mock.
 - **Pendiente:** que el usuario compare la tabla con Tiendanube. Si la diferencia sigue, revisar si su número "real" incluye el envío (se suma `total`, que incluye envío) o si filtra por fecha de creación en vez de fecha de pago.
+
+
+## 14. PR #21 (5/10): color según el ritmo por día
+
+- **Pedido del usuario:** el color tiene que depender de cómo vienen por día: verde si van igual o arriba del promedio necesario, amarillo si van hasta 20% abajo, rojo si van más de 20% abajo. Lo mismo para cada vendedor.
+- **Cálculo** (`pace(line, today)` en `src/lib/goals.ts`):
+  - necesario por día = objetivo / días del mes;
+  - promedio = vendido / días que pasaron, **hoy incluido**;
+  - `ratio ≥ 1` da verde, `≥ 0,8` da amarillo y menos que eso, rojo.
+  - Tiene tests en `src/lib/goals.test.ts`; vitest corre 59 tests.
+- **Barra (`GoalBar`):**
+  - la barra del equipo y la de cada vendedor se pintan emerald-500, amber-400 o rose-500;
+  - chip "🟢 Al día · $X/día de $Y" para el equipo;
+  - "Vos" con el color de su ritmo;
+  - cada vendedor muestra un punto de color y "$X/día · necesita $Y/día".
+- **Ojo:** el día 1 a la mañana todos arrancan en rojo, porque hoy cuenta como día transcurrido. Si molesta, se puede no contar hoy hasta cierta hora.

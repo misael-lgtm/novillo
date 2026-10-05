@@ -103,3 +103,21 @@ export async function getGoalSummary(supabase: SupabaseClient, team: TeamMember[
 export function percent(line: GoalLine): number {
   return line.goal ? Math.round((line.total / line.goal) * 100) : 0;
 }
+
+export type PaceStatus = "ok" | "warn" | "bad";
+
+/**
+ * Cómo vienen por día contra lo que hace falta por día para llegar al objetivo.
+ * Necesario por día = objetivo / días del mes. Promedio = vendido / días que pasaron (hoy incluido).
+ * Verde: igual o arriba. Amarillo: hasta 20% abajo. Rojo: más de 20% abajo.
+ */
+export function pace(line: GoalLine, today: string): { status: PaceStatus; perDay: number; needPerDay: number; ratio: number } | null {
+  if (!line.goal) return null;
+  const [y, m, d] = today.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const needPerDay = line.goal / daysInMonth;
+  const perDay = line.total / d;
+  const ratio = perDay / needPerDay;
+  const status: PaceStatus = ratio >= 1 ? "ok" : ratio >= 0.8 ? "warn" : "bad";
+  return { status, perDay, needPerDay, ratio };
+}
