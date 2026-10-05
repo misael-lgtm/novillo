@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { addMember, setMemberActive } from "@/app/actions";
+import { useRouter } from "next/navigation";
+import { addMember, saveGoals, setMemberActive } from "@/app/actions";
+import { formatMoney } from "@/lib/rules";
 import { Field, ResultBanner, SubmitButton, fieldError, useFormAction } from "./ui";
 
 export function MemberToggle({ email, active }: { email: string; active: boolean }) {
@@ -58,6 +60,79 @@ export function AddMemberForm({ sharedLogins }: { sharedLogins: string[] }) {
       </label>
       <ResultBanner state={state} />
       <SubmitButton pending={pending}>Sumar</SubmitButton>
+    </form>
+  );
+}
+
+export function GoalsForm({
+  month,
+  teamGoal,
+  members,
+}: {
+  /** "YYYY-MM" */
+  month: string;
+  teamGoal: number | null;
+  members: { email: string; name: string; goal: number | null; total: number }[];
+}) {
+  const { state, onSubmit, pending } = useFormAction(saveGoals);
+  const router = useRouter();
+  const err = (f: string) => fieldError(state, f);
+  const fmt = (n: number | null) => (n ? n.toLocaleString("es-AR") : "");
+  const sellersSum = members.reduce((s, m) => s + (m.goal ?? 0), 0);
+  return (
+    // key: al cambiar de mes, el formulario se rearma con los valores de ese mes
+    <form key={month} id="objetivos" onSubmit={onSubmit} data-reset="false" className="card scroll-mt-20 space-y-4 p-5">
+      <div>
+        <h2 className="text-lg font-bold">🎯 Objetivos del mes</h2>
+        <p className="text-sm text-stone-500">
+          En pesos. Cuenta lo que pasa a <b>Compró</b> en ese mes, según el vendedor de la tarjeta. Dejá vacío lo que no quieras medir.
+        </p>
+      </div>
+      <Field label="Mes" name="month" error={err("month")}>
+        <input
+          id="month"
+          name="month"
+          type="month"
+          defaultValue={month}
+          className="input w-auto"
+          onChange={(e) => e.target.value && router.push(`/equipo?mes=${e.target.value}#objetivos`)}
+        />
+      </Field>
+      <Field
+        label="Objetivo del equipo"
+        name="goal:equipo"
+        error={err("goal:equipo")}
+        hint={sellersSum ? `Si lo dejás vacío, se usa la suma de los vendedores (${formatMoney(sellersSum)})` : undefined}
+      >
+        <input id="goal:equipo" name="goal:equipo" defaultValue={fmt(teamGoal)} inputMode="decimal" placeholder="$ 5.000.000" className="input" />
+      </Field>
+      <div className="space-y-3">
+        <p className="text-sm font-semibold">Por vendedor</p>
+        {members.map((m) => (
+          <div key={m.email} className="grid grid-cols-[8rem_1fr] items-center gap-3">
+            <label htmlFor={`goal:${m.email}`} className="text-sm">
+              {m.name}
+              {m.total > 0 && <span className="block text-xs text-stone-500">lleva {formatMoney(m.total)}</span>}
+            </label>
+            <div>
+              <input
+                id={`goal:${m.email}`}
+                name={`goal:${m.email}`}
+                defaultValue={fmt(m.goal)}
+                inputMode="decimal"
+                placeholder="$ 1.000.000"
+                className="input"
+                aria-invalid={!!err(`goal:${m.email}`)}
+              />
+              {err(`goal:${m.email}`) && <p className="mt-1 text-xs font-medium text-rose-700">{err(`goal:${m.email}`)}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <ResultBanner state={state} />
+      <SubmitButton pending={pending} className="btn-primary w-full">
+        Guardar objetivos
+      </SubmitButton>
     </form>
   );
 }
