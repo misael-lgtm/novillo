@@ -381,3 +381,13 @@ El usuario quiere ver todos esos contactos en el tablero.
   - "Vos" con el color de su ritmo;
   - cada vendedor muestra un punto de color y "$X/día · necesita $Y/día".
 - **Ojo:** el día 1 a la mañana todos arrancan en rojo, porque hoy cuenta como día transcurrido. Si molesta, se puede no contar hoy hasta cierta hora.
+
+
+## 15. PR #22 (5/10): todo el fondo del CRM con el color del ritmo
+
+- **Pedido del usuario:** "que cambie todo el fondo del CRM por el color del objetivo", con colores suaves, para tener el objetivo siempre presente.
+- **Cómo está hecho:** `GoalBar` dibuja un `div aria-hidden pointer-events-none fixed inset-0 -z-10` con `bg-emerald-50`, `bg-amber-50` o `bg-rose-50`, según el ritmo **del equipo** (`pace(total)`).
+  - Queda detrás de todo el contenido (el fondo del `body` sigue siendo `bg-stone-50`) y no bloquea clicks.
+  - En modo oscuro esas clases se invierten solas a los 950, que son tonos oscuros.
+- Si el mes no tiene objetivo, el fondo queda como siempre.
+- Se usa el ritmo del equipo, no el de cada vendedor. Si se pide que cada uno vea el suyo, alcanza con usar `minePace ?? teamPace`.
