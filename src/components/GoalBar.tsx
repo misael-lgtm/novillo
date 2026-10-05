@@ -59,7 +59,7 @@ export async function GoalBar() {
                   <>
                     {" "}
                     Sin vendedor asignado: <b className="text-stone-900">{formatMoney(unassigned.total)}</b> ({unassigned.ventas}{" "}
-                    {unassigned.ventas === 1 ? "pedido" : "pedidos"}) — para que sume a alguien, poné su nombre en la nota del pedido en Tiendanube.
+                    {unassigned.ventas === 1 ? "pedido" : "pedidos"}) — para que sume a alguien, cargalo en Tiendanube como “OFF/Nombre”.
                   </>
                 )}
               </>

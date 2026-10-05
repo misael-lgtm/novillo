@@ -23,9 +23,10 @@ const fold = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").t
 
 /**
  * A qué vendedor va cada venta off de Tiendanube:
- * 1) si la nota del pedido nombra a alguien del equipo (ej. "Marian"), a esa persona;
- * 2) si no, al vendedor de la tarjeta del cliente con ese celular o mail en el CRM;
- * 3) si no, queda "sin asignar" (suma solo al equipo).
+ * 1) "OFF/Mariano" → Marian (el nombre se compara por el principio: Mariano/Marian, Fabri/Fabricio);
+ * 2) si no, si la nota del pedido nombra a alguien del equipo, a esa persona;
+ * 3) si no, al vendedor de la tarjeta del cliente con ese celular o mail en el CRM;
+ * 4) si no, queda "sin asignar" (suma solo al equipo).
  */
 async function attributeStoreSales(supabase: SupabaseClient, team: TeamMember[], sales: TnSale[]) {
   const bySeller = new Map<string, Tally>();
@@ -38,10 +39,17 @@ async function attributeStoreSales(supabase: SupabaseClient, team: TeamMember[],
   const names = team
     .map((m) => ({ email: m.email, re: new RegExp(`\\b${fold(m.name.split(" ")[0]).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`) }))
     .filter((n) => n.re.source.length > 6);
-  const byNote = (note: string) => names.find((n) => n.re.test(fold(note)))?.email ?? null;
+  const firsts = team.map((m) => ({ email: m.email, first: fold(m.name.split(" ")[0]) }));
+  const byOffName = (name: string | null) => {
+    if (!name) return null;
+    const n = fold(name);
+    const hit = firsts.find((m) => Math.min(m.first.length, n.length) >= 4 && (m.first.startsWith(n) || n.startsWith(m.first)));
+    return hit?.email ?? null;
+  };
+  const byNote = (x: TnSale) => byOffName(x.offName) ?? names.find((n) => n.re.test(fold(x.note)))?.email ?? null;
 
   // Clientes del CRM con esos celulares / mails, y el vendedor de su tarjeta más reciente.
-  const pending = sales.filter((x) => !byNote(x.note));
+  const pending = sales.filter((x) => !byNote(x));
   const phones = [...new Set(pending.map((x) => normalizePhoneAR(x.phone)).filter((p): p is string => !!p))];
   const emails = [...new Set(pending.map((x) => x.email).filter((e): e is string => !!e))];
   const sellerOfCustomer = new Map<string, string>();
@@ -68,7 +76,7 @@ async function attributeStoreSales(supabase: SupabaseClient, team: TeamMember[],
   for (const x of sales) {
     const phone = normalizePhoneAR(x.phone);
     const seller =
-      byNote(x.note) ?? (phone && sellerOfCustomer.get(`p:${phone}`)) ?? (x.email && sellerOfCustomer.get(`e:${x.email}`)) ?? null;
+      byNote(x) ?? (phone && sellerOfCustomer.get(`p:${phone}`)) ?? (x.email && sellerOfCustomer.get(`e:${x.email}`)) ?? null;
     if (!seller) add(unassigned, x.total);
     else {
       if (!bySeller.has(seller)) bySeller.set(seller, { total: 0, ventas: 0 });

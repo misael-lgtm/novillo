@@ -16,7 +16,21 @@ export const tiendanube = {
 export const isConnected = () => !!(tiendanube.storeId && tiendanube.token);
 
 /** Pedido pagado de la tienda, con lo necesario para asignarlo a un vendedor. */
-export type TnSale = { id: number; number: number | null; total: number; origin: string; phone: string | null; email: string | null; note: string };
+export type TnSale = {
+  id: number;
+  number: number | null;
+  total: number;
+  origin: string;
+  phone: string | null;
+  email: string | null;
+  /** Notas y nombres del pedido, donde los chicos escriben "OFF/Mariano". */
+  note: string;
+  /** El nombre que va después de "OFF/" (ej. "Mariano"), si lo tiene. */
+  offName: string | null;
+};
+
+/** Así marcan los chicos sus ventas en Tiendanube: "OFF/Mariano", "OFF / Fabricio", "off-Bruno"… */
+const OFF_MARK = /\bOFF\s*[\/|\-]\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)/i;
 
 export type StoreSales =
   | {
@@ -54,7 +68,9 @@ type TnOrder = {
   note?: string | null;
   contact_phone?: string | null;
   contact_email?: string | null;
-  customer?: { phone?: string | null; email?: string | null } | null;
+  contact_name?: string | null;
+  billing_name?: string | null;
+  customer?: { name?: string | null; phone?: string | null; email?: string | null } | null;
 };
 
 /** Pedidos pagados en la tienda en el mes (hora argentina, UTC-3), sin los cancelados. null si no está conectada. */
@@ -77,7 +93,7 @@ export async function storeSalesForMonth(month: string): Promise<StoreSales | nu
         status: "any",
         per_page: "200",
         page: String(page),
-        fields: "id,number,total,status,payment_status,storefront,owner_note,note,contact_phone,contact_email,customer",
+        fields: "id,number,total,status,payment_status,storefront,owner_note,note,contact_name,contact_phone,contact_email,billing_name,customer",
       }).toString();
       const res = await fetch(url, {
         headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA },
@@ -96,7 +112,10 @@ export async function storeSalesForMonth(month: string): Promise<StoreSales | nu
         const b = (byOrigin[origin] ??= { total: 0, ventas: 0 });
         b.total += total;
         b.ventas += 1;
-        if (!OFF_ORIGINS.includes(origin)) continue;
+        const note = [o.owner_note, o.note, o.customer?.name, o.contact_name, o.billing_name].filter(Boolean).join(" · ");
+        const offName = note.match(OFF_MARK)?.[1] ?? null;
+        // Venta off: marcada "OFF/Nombre", o cargada a mano en el panel (origen manual).
+        if (!offName && !OFF_ORIGINS.includes(origin)) continue;
         off.push({
           id: o.id,
           number: o.number ?? null,
@@ -104,7 +123,8 @@ export async function storeSalesForMonth(month: string): Promise<StoreSales | nu
           origin,
           phone: o.contact_phone || o.customer?.phone || null,
           email: (o.contact_email || o.customer?.email || null)?.toLowerCase() ?? null,
-          note: [o.owner_note, o.note].filter(Boolean).join(" "),
+          note,
+          offName,
         });
       }
       if (orders.length < 200) break;
