@@ -9,7 +9,7 @@ export async function GoalBar() {
   const team = await getTeam();
   const today = todayAR();
   const month = monthStart(today);
-  const { team: total, members } = await getGoalSummary(supabase, team, month);
+  const { team: total, members, store, crm } = await getGoalSummary(supabase, team, month);
 
   if (!total.goal) {
     if (!me.is_admin) return null;
@@ -46,10 +46,23 @@ export async function GoalBar() {
               Vos: {percent(mine)}%
             </span>
           )}
-          {withGoal.length > 0 && (
-            <span className="text-xs text-stone-500 underline group-open:hidden">Ver por vendedor</span>
+          {(withGoal.length > 0 || store) && (
+            <span className="text-xs text-stone-500 underline group-open:hidden">Ver detalle</span>
           )}
         </summary>
+        {store && (
+          <p className="mt-3 border-t border-stone-100 pt-3 text-xs text-stone-500">
+            {store.ok ? (
+              <>
+                Incluye la tienda online: <b className="text-stone-900">{formatMoney(store.total)}</b> ({store.ventas}{" "}
+                {store.ventas === 1 ? "pedido pagado" : "pedidos pagados"}) + lo cargado en el CRM. Las tarjetas con canal “Tienda online”
+                no se cuentan dos veces.
+              </>
+            ) : (
+              <>⚠️ No se pudo leer la tienda online ({store.error}): por ahora solo cuenta lo cargado en el CRM ({formatMoney(crm.total)}).</>
+            )}
+          </p>
+        )}
         {withGoal.length > 0 && (
           <ul className="mt-3 grid gap-x-6 gap-y-2 border-t border-stone-100 pt-3 sm:grid-cols-2 lg:grid-cols-3">
             {withGoal.map((x) => (

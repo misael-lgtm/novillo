@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getTeam, requireMember } from "@/lib/session";
+import Link from "next/link";
 import { getGoalSummary, monthStart } from "@/lib/goals";
+import { formatMoney } from "@/lib/rules";
 import { AddMemberForm, GoalsForm, MemberToggle } from "@/components/Team";
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
@@ -32,6 +34,21 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           </li>
         ))}
       </ul>
+      <Link href="/tiendanube" className="card flex items-center justify-between gap-3 px-5 py-3 text-sm hover:bg-stone-50">
+        <span>
+          🛒 Tienda online:{" "}
+          {goals.store === null ? (
+            <b>sin conectar</b>
+          ) : goals.store.ok ? (
+            <>
+              <b>conectada</b> · este mes {formatMoney(goals.store.total)} ({goals.store.ventas} pedidos)
+            </>
+          ) : (
+            <b className="text-rose-700">con error</b>
+          )}
+        </span>
+        <span className="underline">{goals.store === null ? "Conectar" : "Ver"}</span>
+      </Link>
       <GoalsForm
         month={month.slice(0, 7)}
         teamGoal={goals.explicitTeamGoal}

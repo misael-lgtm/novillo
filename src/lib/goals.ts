@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { todayAR } from "./rules";
+import { storeSalesForMonth, type StoreSales } from "./tiendanube";
 import type { TeamMember } from "./types";
 
 export const TEAM_SCOPE = "equipo";
@@ -18,11 +19,14 @@ export type GoalLine = { scope: string; name: string; goal: number | null; total
 
 /** Objetivos del mes y cuánto se vendió (Compró) contra cada uno. */
 export async function getGoalSummary(supabase: SupabaseClient, team: TeamMember[], month: string) {
-  const [{ data: goals }, { data: salesData }] = await Promise.all([
+  const [{ data: goals }, { data: salesData }, { data: tiendaData }, store] = await Promise.all([
     supabase.from("monthly_goals").select("scope, amount").eq("month", month).returns<{ scope: string; amount: number }[]>(),
     supabase.rpc("month_sales", { p_month: month }),
+    supabase.rpc("month_sales_tienda", { p_month: month }),
+    storeSalesForMonth(month),
   ]);
   const sales = (salesData ?? []) as { member: string; total: number; ventas: number }[];
+  const crmTienda = ((tiendaData ?? []) as { total: number; ventas: number }[])[0];
   const goalOf = new Map((goals ?? []).map((g) => [g.scope, Number(g.amount)]));
   const saleOf = new Map(sales.map((s) => [s.member, s]));
 
@@ -38,15 +42,26 @@ export async function getGoalSummary(supabase: SupabaseClient, team: TeamMember[
     }));
 
   const sellersGoal = members.reduce((s, m) => s + (m.goal ?? 0), 0);
+  const crm = {
+    total: sales.reduce((s, x) => s + Number(x.total), 0),
+    ventas: sales.reduce((s, x) => s + Number(x.ventas), 0),
+  };
+  // Con la tienda conectada: CRM sin el canal "Tienda online" (esas ya vienen de Tiendanube) + Tiendanube.
+  const withStore = store?.ok
+    ? {
+        total: crm.total - Number(crmTienda?.total ?? 0) + store.total,
+        ventas: crm.ventas - Number(crmTienda?.ventas ?? 0) + store.ventas,
+      }
+    : crm;
   const teamLine: GoalLine = {
     scope: TEAM_SCOPE,
     name: "Equipo",
     // Si no cargaron el del equipo, es la suma de los vendedores.
     goal: goalOf.get(TEAM_SCOPE) ?? (sellersGoal || null),
-    total: sales.reduce((s, x) => s + Number(x.total), 0),
-    ventas: sales.reduce((s, x) => s + Number(x.ventas), 0),
+    total: withStore.total,
+    ventas: withStore.ventas,
   };
-  return { month, team: teamLine, members, explicitTeamGoal: goalOf.get(TEAM_SCOPE) ?? null };
+  return { month, team: teamLine, members, explicitTeamGoal: goalOf.get(TEAM_SCOPE) ?? null, store, crm };
 }
 
 export function percent(line: GoalLine): number {
