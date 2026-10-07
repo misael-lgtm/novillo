@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import makeWASocket, { ALL_WA_PATCH_NAMES, Browsers, DisconnectReason, downloadMediaMessage, fetchLatestBaileysVersion, useMultiFileAuthState } from "baileys";
 import { createClient } from "@supabase/supabase-js";
 import pino from "pino";
-import { chatJid, imageOf, nameOf, normalizeJid, phoneOf, toRow } from "./mensajes.mjs";
+import { chatJid, mediaOf, nameOf, normalizeJid, phoneOf, toRow } from "./mensajes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -42,7 +42,7 @@ const SESSIONS = join(HERE, "sesiones");
 // Del historial que manda WhatsApp al vincular, guardar solo lo de los últimos N días.
 const HISTORY_DAYS = Number(process.env.DIAS_DE_HISTORIAL || 30);
 const MEDIA_BUCKET = "wa-media";
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const MAX_MEDIA_BYTES = 16 * 1024 * 1024; // como el límite de WhatsApp
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error("Falta configurar SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en el archivo .env (ver .env.ejemplo).");
@@ -87,21 +87,20 @@ async function phonesOf(line, jids) {
   return out;
 }
 
-/** Baja una foto de WhatsApp y la sube al bucket. Devuelve la ruta o null. */
-async function savePhoto(line, m) {
-  const img = imageOf(m.message);
-  if (!img || (img.size && img.size > MAX_PHOTO_BYTES) || sentFromCrm.has(m.key.id)) return null;
+/** Baja el archivo de un mensaje (foto, sticker, audio, video o documento) y lo sube al bucket. Devuelve la ruta o null. */
+async function saveMedia(line, m) {
+  const media = mediaOf(m.message);
+  if (!media || (media.size && media.size > MAX_MEDIA_BYTES) || sentFromCrm.has(m.key.id)) return null;
   const sock = sockets.get(line);
   try {
     const buf = await downloadMediaMessage(m, "buffer", {}, { logger, reuploadRequest: sock?.updateMediaMessage });
-    if (buf.length > MAX_PHOTO_BYTES) return null;
-    const type = /png|webp/.test(m.message?.imageMessage?.mimetype ?? "") ? m.message.imageMessage.mimetype : "image/jpeg";
-    const path = `in/${line}/${String(m.key.id).replace(/[^\w-]/g, "_")}.${type.split("/")[1].replace("jpeg", "jpg")}`;
-    const { error } = await db.storage.from(MEDIA_BUCKET).upload(path, buf, { contentType: type, upsert: true });
+    if (buf.length > MAX_MEDIA_BYTES) return null;
+    const path = `in/${line}/${String(m.key.id).replace(/[^\w-]/g, "_")}.${media.ext}`;
+    const { error } = await db.storage.from(MEDIA_BUCKET).upload(path, buf, { contentType: media.type, upsert: true });
     if (error) throw new Error(error.message);
     return path;
   } catch (e) {
-    log(line, "no se pudo guardar una foto:", e.message);
+    log(line, `no se pudo guardar un archivo (${media.kind}):`, e.message);
     return null;
   }
 }
@@ -114,9 +113,9 @@ async function saveMessages(line, msgs, { history = false } = {}) {
     const row = toRow(line, m);
     if (!row) continue;
     if (history && Date.parse(row.at) < since) continue;
-    // Las fotos nuevas se guardan para verlas en el CRM (las del historial no: serían demasiadas).
-    if (!history && row.kind === "foto") {
-      const path = await savePhoto(line, m);
+    // Fotos, stickers, audios, videos y documentos nuevos se guardan para verlos en el CRM (los del historial no: serían demasiados).
+    if (!history) {
+      const path = await saveMedia(line, m);
       if (path) row.media_path = path;
     }
     rows.push(row);
@@ -344,7 +343,7 @@ async function tick() {
   try {
     const { data: pending } = await db
       .from("wa_outbox")
-      .select("id, line, jid, body, created_by, media_path, media_type")
+      .select("id, line, jid, body, created_by, media_path, media_type, media_kind")
       .is("sent_at", null)
       .is("error", null)
       .in("line", LINES)
@@ -357,18 +356,20 @@ async function tick() {
         let sent, body, kind;
         if (p.media_path) {
           const { data: file, error } = await db.storage.from(MEDIA_BUCKET).download(p.media_path);
-          if (error || !file) throw new Error(`no se encontró la foto (${error?.message ?? "vacía"})`);
-          const image = Buffer.from(await file.arrayBuffer());
-          sent = await sock.sendMessage(p.jid, {
-            image,
-            caption: p.body?.trim() || undefined,
-            mimetype: p.media_type || "image/jpeg",
-          });
+          if (error || !file) throw new Error(`no se encontró el archivo (${error?.message ?? "vacío"})`);
+          const buf = Buffer.from(await file.arrayBuffer());
+          if (p.media_kind === "sticker") {
+            sent = await sock.sendMessage(p.jid, { sticker: buf });
+            body = "🩷 Sticker";
+            kind = "sticker";
+          } else {
+            sent = await sock.sendMessage(p.jid, { image: buf, caption: p.body?.trim() || undefined, mimetype: p.media_type || "image/jpeg" });
+            body = p.body?.trim() ? `📷 ${p.body.trim()}` : "📷 Foto";
+            kind = "foto";
+          }
           sentFromCrm.add(sent.key.id);
           // Cuando mandan muchas juntas, de a una con un respiro (como haría una persona).
           await new Promise((r) => setTimeout(r, 1000));
-          body = p.body?.trim() ? `📷 ${p.body.trim()}` : "📷 Foto";
-          kind = "foto";
         } else {
           sent = await sock.sendMessage(p.jid, { text: p.body });
           body = p.body;

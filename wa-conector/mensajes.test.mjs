@@ -1,7 +1,7 @@
 // node --test wa-conector/mensajes.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatJid, contentOf, dateOf, imageOf, nameOf, phoneOf, toRow } from "./mensajes.mjs";
+import { chatJid, contentOf, dateOf, imageOf, mediaOf, nameOf, phoneOf, toRow } from "./mensajes.mjs";
 
 test("chat: número normal, con el :dispositivo sacado", () => {
   assert.equal(chatJid({ remoteJid: "5491123456789:3@s.whatsapp.net" }), "5491123456789@s.whatsapp.net");
@@ -77,4 +77,17 @@ test("nombre: agendado primero, si no el que se puso la persona", () => {
   assert.equal(nameOf({ name: "Juan Tienda", notify: "Juancito" }), "Juan Tienda");
   assert.equal(nameOf({ notify: " Juancito " }), "Juancito");
   assert.equal(nameOf({ id: "1@lid" }), null);
+});
+
+test("archivos: foto, sticker, audio de voz, documento raro; texto no", () => {
+  assert.deepEqual(mediaOf({ imageMessage: { mimetype: "image/jpeg", fileLength: 10 } }), { kind: "foto", size: 10, type: "image/jpeg", ext: "jpg" });
+  assert.deepEqual(mediaOf({ stickerMessage: { mimetype: "image/webp" } }), { kind: "sticker", size: null, type: "image/webp", ext: "webp" });
+  assert.deepEqual(mediaOf({ audioMessage: { mimetype: "audio/ogg; codecs=opus", ptt: true } }), { kind: "audio", size: null, type: "audio/ogg", ext: "ogg" });
+  assert.deepEqual(mediaOf({ documentWithCaptionMessage: { message: { documentMessage: { mimetype: "application/vnd.ms-excel" } } } }), {
+    kind: "documento",
+    size: null,
+    type: "application/octet-stream",
+    ext: "bin",
+  });
+  assert.equal(mediaOf({ conversation: "hola" }), null);
 });

@@ -91,6 +91,40 @@ export function imageOf(message) {
   return { size };
 }
 
+const MEDIA_TYPES = { imageMessage: "foto", stickerMessage: "sticker", audioMessage: "audio", videoMessage: "video", documentMessage: "documento" };
+const EXTENSIONS = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "audio/ogg": "ogg",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/aac": "aac",
+  "video/mp4": "mp4",
+  "video/3gpp": "3gp",
+  "application/pdf": "pdf",
+};
+
+/**
+ * Si el mensaje trae un archivo (foto, sticker, audio, video o documento): { kind, size, type, ext }.
+ * type es el tipo de archivo para guardarlo (los documentos raros van como "bin").
+ */
+export function mediaOf(message) {
+  const m = unwrap(message);
+  const key = m && Object.keys(MEDIA_TYPES).find((k) => m[k]);
+  if (!key) return null;
+  const v = m[key];
+  const n = v.fileLength;
+  const size = typeof n === "number" ? n : n && typeof n === "object" && "low" in n ? n.low >>> 0 : Number(n) || null;
+  const mime = String(v.mimetype ?? "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+  const fallback = { foto: "image/jpeg", sticker: "image/webp", audio: "audio/ogg", video: "video/mp4" }[MEDIA_TYPES[key]];
+  const type = EXTENSIONS[mime] ? mime : (fallback ?? "application/octet-stream");
+  return { kind: MEDIA_TYPES[key], size, type, ext: EXTENSIONS[type] ?? "bin" };
+}
+
 /** Nombre para mostrar de un contacto o chat de WhatsApp: el que tienen agendado en el celu, si no el que se puso la persona. */
 export function nameOf(c) {
   const n = c?.name || c?.displayName || c?.notify || c?.verifiedName || c?.username;

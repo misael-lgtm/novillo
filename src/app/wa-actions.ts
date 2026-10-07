@@ -214,3 +214,61 @@ export async function unlinkWaLine(line: string): Promise<ActionResult> {
   if (error) return { ok: false, error: "No se pudo." };
   return { ok: true };
 }
+
+// ── Stickers ──────────────────────────────────────────────────
+
+/** Los stickers que ya pasaron por este teléfono (los últimos 60 distintos), para reenviarlos. */
+export async function getWaStickers(line: string): Promise<string[]> {
+  if (!validLine(line)) return [];
+  const { supabase } = await requireMember();
+  const { data } = await supabase
+    .from("wa_messages")
+    .select("media_path")
+    .eq("line", line)
+    .eq("kind", "sticker")
+    .not("media_path", "is", null)
+    .order("at", { ascending: false })
+    .limit(300);
+  return [...new Set((data ?? []).map((m) => m.media_path as string))].slice(0, 60);
+}
+
+export async function queueWaSticker(line: string, jid: string, path: string): Promise<ActionResult> {
+  if (!validLine(line)) return { ok: false, error: "Teléfono inválido." };
+  if (!validJid(jid)) return { ok: false, error: "Chat inválido." };
+  if (!new RegExp(`^in/${line}/[\\w-]+\\.webp$`).test(path)) return { ok: false, error: "Sticker inválido." };
+  const { supabase, me } = await requireMember();
+  const { error } = await supabase
+    .from("wa_outbox")
+    .insert({ line, jid, body: "", media_path: path, media_type: "image/webp", media_kind: "sticker", created_by: me.email });
+  if (error) return { ok: false, error: "No se pudo mandar. Probá de nuevo." };
+  return { ok: true };
+}
+
+// ── Respuestas rápidas ("/atajo") ─────────────────────────────
+
+export type WaQuickReply = { id: string; shortcut: string; body: string };
+
+export async function getWaQuickReplies(): Promise<WaQuickReply[]> {
+  const { supabase } = await requireMember();
+  const { data } = await supabase.from("wa_quick_replies").select("id, shortcut, body").order("shortcut").returns<WaQuickReply[]>();
+  return data ?? [];
+}
+
+export async function saveWaQuickReply(input: { id?: string; shortcut: string; body: string }): Promise<ActionResult> {
+  const shortcut = input.shortcut.trim().replace(/^\//, "").toLowerCase().replace(/\s+/g, "-");
+  const body = input.body.trim();
+  if (!/^[a-z0-9áéíóúñü_-]{1,30}$/.test(shortcut)) return { ok: false, error: "El atajo va sin espacios ni símbolos (ej: precios, envio, local)." };
+  if (!body) return { ok: false, error: "Escribí el mensaje." };
+  const { supabase, me } = await requireMember();
+  const row = { shortcut, body: body.slice(0, 4000), created_by: me.email, updated_at: new Date().toISOString() };
+  const { error } = input.id ? await supabase.from("wa_quick_replies").update(row).eq("id", input.id) : await supabase.from("wa_quick_replies").insert(row);
+  if (error) return { ok: false, error: error.code === "23505" ? `Ya existe /${shortcut}.` : "No se pudo guardar." };
+  return { ok: true };
+}
+
+export async function deleteWaQuickReply(id: string): Promise<ActionResult> {
+  const { supabase } = await requireMember();
+  const { error } = await supabase.from("wa_quick_replies").delete().eq("id", id);
+  if (error) return { ok: false, error: "No se pudo borrar." };
+  return { ok: true };
+}
