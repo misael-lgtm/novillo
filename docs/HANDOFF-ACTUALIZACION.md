@@ -701,3 +701,18 @@ El usuario quiere ver todos esos contactos en el tablero.
   - las respuestas rápidas guardadas en el celu no se pueden leer: Baileys no emite el evento `quickReplyAction`;
   - GIFs: hace falta una API key de Giphy o Tenor;
   - mandar audios o videos desde el CRM.
+
+## 27. PR siguiente (7/10): festejo en pantalla por cada venta off nueva
+
+- **Pedido:** que pase un emoji por la pantalla cada vez que entra una venta off/. Después, que aparezca "ese sticker de Messi sin el fondo rojo".
+- **Cómo funciona:**
+  - `SaleCelebration` (en el layout) llama cada 60 s a `getOffSalesFeed()` (en `src/app/goal-actions.ts`), que devuelve las ventas off del mes con su vendedor;
+  - los ids ya vistos se guardan en localStorage (`crm_ventas_off_vistas`). La primera vez y al cambiar de mes solo se anotan;
+  - si hay una venta nueva: vuelan 36 emojis, sube la imagen del festejo desde abajo a la derecha y aparece el cartel "¡Venta off de X! $monto" durante 5,5 s. Después hace `router.refresh()` para que la barra del objetivo sume la venta;
+  - con `prefers-reduced-motion` se ve solo el cartel.
+- **Tiendanube:** la caché de los pedidos bajó de 10 a 2 minutos y se puede cambiar con `TIENDANUBE_REVALIDATE_SECONDS`.
+- **Imagen del festejo:**
+  - la carga el admin en Equipo → "🎉 Festejo de ventas" (`CelebrationImageForm`);
+  - el fondo liso se saca en el navegador: se rellena desde los bordes con el color de las esquinas y se frena en el borde blanco del sticker. Después se recorta y se achica a 420 px como máximo;
+  - se guarda como PNG en data URL en la tabla nueva `app_settings` (migración `0013`, ya aplicada): el equipo puede leerla y solo el admin escribirla.
+  - **Ojo:** el usuario mandó el sticker de Messi como imagen en el chat. No se puede extraer de ahí, así que lo tiene que subir él. Se le saca solo el fondo; la marca de la tienda que hizo el sticker queda.

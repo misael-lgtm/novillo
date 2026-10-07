@@ -128,8 +128,8 @@ export async function storeSalesForMonth(month: string): Promise<StoreSales | nu
       }).toString();
       const res = await fetch(url, {
         headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA },
-        // Se vuelve a pedir a lo sumo cada 10 minutos.
-        next: { revalidate: 600 },
+        // Se vuelve a pedir a lo sumo cada 2 minutos (lo comparten todos los que tienen el CRM abierto).
+        next: { revalidate: Number(process.env.TIENDANUBE_REVALIDATE_SECONDS) || 120 },
       });
       // Tiendanube devuelve 404 cuando la página ya no tiene pedidos.
       if (res.status === 404) break;
