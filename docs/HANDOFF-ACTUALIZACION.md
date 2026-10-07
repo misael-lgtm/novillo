@@ -616,3 +616,30 @@ El usuario quiere ver todos esos contactos en el tablero.
 - **Ojo con el zip:** `public/conector/wa-conector.zip` hay que **regenerarlo a mano** si cambia `wa-conector/`. Lleva conector.mjs, mensajes.mjs, package.json, package-lock.json, .env.ejemplo, `.env` en blanco, iniciar.bat y LEEME.txt.
 - **Instructivo:** `/telefonos/conector` ahora tiene la línea para copiar y el link directo al zip para PC.
 - **Probado:** el instalador se corrió en el contenedor con apt/pkg/termux simulados. Llega hasta "No cierres esta ventana", y se probó aparte que guarda la clave. **No se probó en un Android real.**
+
+## 22. PR siguiente (7/10): fotos, etiquetas y número en los chats de WhatsApp
+
+- **Pedidos del usuario:** "no me deja mandar fotos por conversación", "quiero ver las listas o etiquetas y poder etiquetar yo" y que en la lista de chats aparezca el número (casi todos decían "Sin nombre").
+- **Migración `0011_whatsapp_fotos_etiquetas.sql`** (ya aplicada en producción):
+  - `wa_outbox.media_path` (tiene que empezar con `out/`) y `media_type`; el body puede quedar vacío si hay foto. `wa_messages.media_path`.
+  - Bucket privado `wa-media` en Storage (máx. 10 MB, jpg/png/webp). Políticas: el equipo lee todo y sube solo a `out/`. El conector usa la service key, así que sube a `in/`.
+  - `wa_labels` (las etiquetas de cada teléfono), `wa_chat_labels` (qué chat tiene cuál) y `wa_label_ops` (cola de poner/sacar desde el CRM). La vista `wa_chat_list` ahora trae `labels text[]`.
+  - `wa_touch_chat` ya no pisa el nombre que tiene el chat: el agendado en el celu le gana al que se puso la persona.
+- **CRM:**
+  - `sendWaPhoto(FormData)` sube la foto a `out/<línea>/<uuid>.jpg` y la deja en la cola. Antes, el navegador la achica a máx. 1600 px, JPG 0.82. `serverActions.bodySizeLimit` está en 5mb.
+  - Botón 📷; también se puede pegar una imagen con Ctrl+V. La foto queda en vista previa y el texto pasa a ser el epígrafe.
+  - `/api/wa-media?p=...` sirve las fotos del bucket, solo para el equipo y con caché privada.
+  - Etiquetas: filtros arriba de la lista de chats, chips en cada chat, y un botón "🏷️ Etiquetar" en la conversación que abre checkboxes. `setWaChatLabel` deja el pedido en la cola, y la etiqueta se ve al toque aunque esté pendiente.
+  - En la lista se ve el número debajo del nombre; si no hay nombre, el número es el título.
+- **Conector:**
+  - **Fotos:** las de la cola se bajan del bucket y salen con `sendMessage({image, caption})`. Las que llegan en vivo se bajan con `downloadMediaMessage` y se suben a `in/`; las del historial no.
+  - **Números:** los chats `@lid` sin número se completan con `lidMapping.getPNsForLIDs`, y también con `lid-mapping.update` y los contactos.
+  - **Nombres:** salen de `contacts.upsert/update` y de los chats/contactos del historial.
+  - **Etiquetas:** llegan con `labels.edit` / `labels.association`. Las de la cola se aplican con `addChatLabel` / `removeChatLabel`, usando el `@lid` si se conoce.
+  - **Resincronización:** se hace una sola vez por teléfono, 20 s después de conectar, borrando las versiones de app-state y llamando `resyncAppState(ALL, true)`. Hace falta porque las etiquetas y los contactos de antes no se habían guardado. Deja la marca `sesiones/<línea>/crm-resync-1`.
+- **Zip:** `public/conector/wa-conector.zip` está regenerado. `android.sh` ahora cierra el conector viejo antes de arrancar, para que actualizar sea pegar la misma línea en una sesión nueva de Termux.
+- **Probado:**
+  - Playwright con Storage simulado en el gateway: número en la lista, filtro por etiqueta, foto recibida, etiquetar, mandar foto con y sin texto, y vista de celu;
+  - políticas de Storage y checks en SQL;
+  - 9 tests del parser y 60 de vitest.
+  - **No probado contra WhatsApp real** (bloqueado desde el contenedor). Lo más incierto: si `addChatLabel` con el jid elegido se refleja en el celu, y si la resincronización trae todas las etiquetas y nombres.

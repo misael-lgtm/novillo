@@ -82,6 +82,21 @@ export function contentOf(message) {
   }
 }
 
+/** Si el mensaje es una foto: { size } (bytes, si viene), si no null. */
+export function imageOf(message) {
+  const img = unwrap(message)?.imageMessage;
+  if (!img) return null;
+  const n = img.fileLength;
+  const size = typeof n === "number" ? n : n && typeof n === "object" && "low" in n ? n.low >>> 0 : Number(n) || null;
+  return { size };
+}
+
+/** Nombre para mostrar de un contacto o chat de WhatsApp: el que tienen agendado en el celu, si no el que se puso la persona. */
+export function nameOf(c) {
+  const n = c?.name || c?.displayName || c?.notify || c?.verifiedName || c?.username;
+  return typeof n === "string" && n.trim() ? n.trim().slice(0, 120) : null;
+}
+
 /** Fecha del mensaje (messageTimestamp viene en segundos, a veces como objeto Long). */
 export function dateOf(msg) {
   const t = msg?.messageTimestamp;
