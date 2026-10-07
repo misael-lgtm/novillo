@@ -643,3 +643,13 @@ El usuario quiere ver todos esos contactos en el tablero.
   - políticas de Storage y checks en SQL;
   - 9 tests del parser y 60 de vitest.
   - **No probado contra WhatsApp real** (bloqueado desde el contenedor). Lo más incierto: si `addChatLabel` con el jid elegido se refleja en el celu, y si la resincronización trae todas las etiquetas y nombres.
+
+## 23. PR siguiente (7/10): arreglo de etiquetas por chat
+
+- **Bug:** en Baileys, el tipo de asociación de chat es `"label_jid"`, no `"chat"`. Por eso `wa_chat_labels` quedaba vacía, aunque las etiquetas (`wa_labels`) sí llegaban.
+- **Arreglo:** se corrige el chequeo y la marca pasa a `crm-resync-2`, así la resincronización se repite una vez más y trae qué chat tiene cada etiqueta.
+- **Estado en producción antes del arreglo:**
+  - etiquetas: 23 en Carritos y 21 en Güemes;
+  - chats con número: 337 en Carritos y 269 en Güemes (de 60 y 1 que había antes);
+  - sin número: 171 en Carritos y 1548 en Güemes. Son chats `@lid` cuyo número WhatsApp no le pasó al conector; se completan cuando la persona escribe de nuevo;
+  - una foto mandada desde el CRM salió bien.

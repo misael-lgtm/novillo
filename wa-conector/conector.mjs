@@ -232,7 +232,8 @@ async function saveLabel(line, l) {
 }
 
 async function saveLabelAssociation(line, { association, type }) {
-  if (association?.type !== "chat" || !association.chatId) return;
+  // Baileys marca las de chat como "label_jid" (las de mensaje, "label_message": esas no van).
+  if (association?.type !== "label_jid" || !association.chatId) return;
   const jid = await storedJid(line, association.chatId);
   const row = { line, jid, label_id: String(association.labelId) };
   const { error } =
@@ -245,7 +246,8 @@ async function saveLabelAssociation(line, { association, type }) {
  * anteriores del conector no lo guardaban. Queda una marca en la carpeta de la sesión para no repetirlo.
  */
 async function fullResyncOnce(line, sock, keys) {
-  const mark = join(SESSIONS, line, "crm-resync-1");
+  // "-2": la primera vez no se guardaban qué chat tenía cada etiqueta, así que se pide todo de nuevo.
+  const mark = join(SESSIONS, line, "crm-resync-2");
   if (existsSync(mark)) return;
   try {
     await keys.set({
