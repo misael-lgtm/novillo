@@ -255,12 +255,15 @@ export function WaInbox({
   isAdmin,
   connectorHelp,
   initialPhone,
+  initialText,
 }: {
   line: string;
   short: string;
   isAdmin: boolean;
   connectorHelp: string;
   initialPhone?: string;
+  /** Mensaje ya escrito para ese chat (ej. desde Carritos abandonados). */
+  initialText?: string;
 }) {
   const [state, setState] = useState<WaLineState | null>(null);
   const [chats, setChats] = useState<WaChat[]>([]);
@@ -272,6 +275,7 @@ export function WaInbox({
   const [newChat, setNewChat] = useState(false);
   const [newPhone, setNewPhone] = useState("");
   const [newError, setNewError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ jid: string; text: string } | null>(null);
 
   async function startChat(raw: string) {
     setNewError(null);
@@ -281,11 +285,15 @@ export function WaInbox({
     setOpenChat(r.data);
     setNewChat(false);
     setNewPhone("");
+    return r.data.jid;
   }
 
   // Link directo para escribirle a alguien: /telefonos/carritos?numero=1123456789
   useEffect(() => {
-    if (initialPhone) startChat(initialPhone);
+    if (initialPhone)
+      startChat(initialPhone).then((jid) => {
+        if (jid && initialText) setDraft({ jid, text: initialText });
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPhone]);
   // El chat abierto, con sus datos al día (etiquetas, nombre) aunque deje de estar en la lista filtrada.
@@ -472,7 +480,15 @@ export function WaInbox({
         </aside>
         <section className={`min-h-0 flex-col ${open ? "flex" : "hidden md:flex"}`}>
           {open ? (
-            <Conversation key={open.jid} line={line} chat={open} labels={labels} onBack={() => setOpenJid(null)} onSent={() => load().catch(() => {})} />
+            <Conversation
+              key={open.jid}
+              line={line}
+              chat={open}
+              labels={labels}
+              initialText={draft?.jid === open.jid ? draft.text : undefined}
+              onBack={() => setOpenJid(null)}
+              onSent={() => load().catch(() => {})}
+            />
           ) : (
             <div className="m-auto max-w-xs p-6 text-center text-stone-500">
               <p className="text-5xl" aria-hidden>
@@ -517,9 +533,27 @@ function QrPanel({ qr, short }: { qr: string; short: string }) {
   );
 }
 
-function Conversation({ line, chat, labels, onBack, onSent }: { line: string; chat: WaChat; labels: WaLabel[]; onBack: () => void; onSent: () => void }) {
+function Conversation({
+  line,
+  chat,
+  labels,
+  initialText,
+  onBack,
+  onSent,
+}: {
+  line: string;
+  chat: WaChat;
+  labels: WaLabel[];
+  initialText?: string;
+  onBack: () => void;
+  onSent: () => void;
+}) {
   const [msgs, setMsgs] = useState<WaMessage[]>([]);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText ?? "");
+  // Mensaje ya armado (ej. desde Carritos abandonados): queda escrito para revisarlo y mandarlo.
+  useEffect(() => {
+    if (initialText) setText((t) => t || initialText);
+  }, [initialText]);
   const [photos, setPhotos] = useState<{ blob: Blob; url: string }[]>([]);
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);

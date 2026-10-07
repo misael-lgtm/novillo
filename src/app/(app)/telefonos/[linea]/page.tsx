@@ -5,9 +5,9 @@ import { requireMember } from "@/lib/session";
 import { WaInbox } from "@/components/WaInbox";
 
 /** Pestañas Carritos / Güemes / Palermo: vincular por QR y chatear desde el CRM. */
-export default async function TelefonoPage({ params, searchParams }: { params: Promise<{ linea: string }>; searchParams: Promise<{ numero?: string }> }) {
+export default async function TelefonoPage({ params, searchParams }: { params: Promise<{ linea: string }>; searchParams: Promise<{ numero?: string; texto?: string }> }) {
   const { linea } = await params;
-  const { numero } = await searchParams;
+  const { numero, texto } = await searchParams;
   const line = PHONE_LINES.find((l) => l.id === linea);
   if (!line) notFound();
   const { me } = await requireMember();
@@ -32,7 +32,7 @@ export default async function TelefonoPage({ params, searchParams }: { params: P
           </Link>
         ))}
       </nav>
-      <WaInbox line={line.id} short={line.short} isAdmin={me.is_admin} connectorHelp="/telefonos/conector" initialPhone={numero} />
+      <WaInbox line={line.id} short={line.short} isAdmin={me.is_admin} connectorHelp="/telefonos/conector" initialPhone={numero} initialText={texto} />
     </div>
   );
 }
