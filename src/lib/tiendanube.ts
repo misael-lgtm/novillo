@@ -291,7 +291,8 @@ const textOf = (x: unknown) => (typeof x === "string" ? x : x && typeof x === "o
 /** Los carritos abandonados de los últimos días, del más nuevo al más viejo. null si la tienda no está conectada. */
 export async function abandonedCarts(days = 30): Promise<{ ok: true; carts: TnCart[] } | { ok: false; error: string } | null> {
   if (!isConnected()) return null;
-  const since = new Date(Date.now() - days * 86400000).toISOString();
+  // Redondeado al día: así la dirección es la misma todo el día y la caché de 2 minutos sirve para todos.
+  const since = new Date(Math.floor((Date.now() - days * 86400000) / 86400000) * 86400000).toISOString();
   const carts: TnCart[] = [];
   try {
     for (let page = 1; page <= 20; page++) {
@@ -333,4 +334,10 @@ export async function abandonedCarts(days = 30): Promise<{ ok: true; carts: TnCa
 /** "Buzo Alaska (M) x2, Remera Lino (L)" */
 export function cartSummary(c: TnCart): string {
   return c.products.map((p) => `${p.name}${p.variant ? ` (${p.variant})` : ""}${p.qty > 1 ? ` x${p.qty}` : ""}`).join(", ");
+}
+
+/** Mensaje para escribirle por WhatsApp a alguien que dejó el carrito. */
+export function cartMessage(c: TnCart, seller: string): string {
+  const first = (c.name ?? "").split(" ")[0];
+  return `Hola${first ? ` ${first}` : ""}! Te habla ${seller} de Wayfarer 🤙 Vimos que te quedó en el carrito ${cartSummary(c)}. ¿Te ayudo a terminar la compra?${c.url ? ` Acá lo tenés: ${c.url}` : ""}`;
 }

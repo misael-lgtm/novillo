@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FINAL_STAGES } from "@/lib/config";
 import { formatMoney, formatPhone } from "@/lib/rules";
 import { requireMember } from "@/lib/session";
-import { abandonedCarts, cartSummary } from "@/lib/tiendanube";
+import { abandonedCarts, cartMessage, cartSummary } from "@/lib/tiendanube";
 import { CartActions } from "@/components/CartActions";
 
 export const metadata = { title: "Carritos abandonados" };
@@ -107,8 +107,7 @@ export default async function CarritosPage({ searchParams }: { searchParams: Pro
           const customer = customers.find((x) => (c.phone && x.phone === c.phone) || (c.email && x.email === c.email));
           const order = customer ? (openOrders ?? []).find((o) => o.customer_id === customer.id) : undefined;
           const chat = c.phone ? chatOf.get(c.phone) : undefined;
-          const first = (c.name ?? "").split(" ")[0];
-          const message = `Hola${first ? ` ${first}` : ""}! Te habla ${firstName} de Wayfarer 🤙 Vimos que te quedó en el carrito ${cartSummary(c)}. ¿Te ayudo a terminar la compra?${c.url ? ` Acá lo tenés: ${c.url}` : ""}`;
+          const message = cartMessage(c, firstName);
           return (
             <li key={c.id} className="card flex flex-col gap-3 p-4">
               <div className="flex items-start justify-between gap-2">

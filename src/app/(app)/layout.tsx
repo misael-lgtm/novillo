@@ -2,6 +2,7 @@ import { requireMember } from "@/lib/session";
 import { GoalBar } from "@/components/GoalBar";
 import { Nav } from "@/components/Nav";
 import { SaleCelebration } from "@/components/SaleCelebration";
+import { CartAlerts } from "@/components/CartAlerts";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { me, shared } = await requireMember();
@@ -11,6 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <GoalBar />
       <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
       <SaleCelebration />
+      <CartAlerts />
     </div>
   );
 }
