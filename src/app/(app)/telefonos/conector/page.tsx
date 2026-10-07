@@ -71,6 +71,10 @@ export default function ConectorPage() {
           Si se cierra: abrí Termux y escribí <code className="rounded bg-stone-100 px-1">bash ~/conector.sh</code>. Android a veces cierra apps en segundo
           plano: en una PC se corta menos.
         </p>
+        <p className="text-xs text-stone-500">
+          <b>Para actualizarlo</b> (cuando hay novedades): en Termux deslizá desde el borde izquierdo → <b>New session</b>, pegá la misma línea de
+          arriba y Enter. No pide la clave de nuevo ni hay que volver a escanear los QR.
+        </p>
       </section>
 
       <section className="card space-y-2 p-5 text-sm">

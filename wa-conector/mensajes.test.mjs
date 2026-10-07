@@ -1,7 +1,7 @@
 // node --test wa-conector/mensajes.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatJid, contentOf, dateOf, phoneOf, toRow } from "./mensajes.mjs";
+import { chatJid, contentOf, dateOf, imageOf, nameOf, phoneOf, toRow } from "./mensajes.mjs";
 
 test("chat: número normal, con el :dispositivo sacado", () => {
   assert.equal(chatJid({ remoteJid: "5491123456789:3@s.whatsapp.net" }), "5491123456789@s.whatsapp.net");
@@ -55,4 +55,26 @@ test("fila completa", () => {
     at: new Date(1790000000 * 1000).toISOString(),
   });
   assert.equal(toRow("carritos", { key: { remoteJid: "1@g.us", id: "x" }, message: { conversation: "grupo" } }), null);
+});
+
+test("foto: tamaño, también dentro de un temporal; lo demás no es foto", () => {
+  assert.deepEqual(imageOf({ imageMessage: { fileLength: 12345 } }), {
+    size: 12345,
+  });
+  assert.deepEqual(
+    imageOf({
+      ephemeralMessage: {
+        message: { imageMessage: { fileLength: { low: 99, high: 0 } } },
+      },
+    }),
+    { size: 99 },
+  );
+  assert.equal(imageOf({ conversation: "hola" }), null);
+  assert.equal(imageOf({ videoMessage: {} }), null);
+});
+
+test("nombre: agendado primero, si no el que se puso la persona", () => {
+  assert.equal(nameOf({ name: "Juan Tienda", notify: "Juancito" }), "Juan Tienda");
+  assert.equal(nameOf({ notify: " Juancito " }), "Juancito");
+  assert.equal(nameOf({ id: "1@lid" }), null);
 });

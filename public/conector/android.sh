@@ -39,6 +39,9 @@ if ! grep -qE '^SUPABASE_SERVICE_ROLE_KEY=.+' .env; then
 fi
 
 echo "[5/5] Dejándolo para que arranque solo…"
+# Si ya estaba andando (es una actualización), cerrar el viejo para que no queden dos.
+pkill -f "conector.sh" 2>/dev/null || true
+pkill -f "node conector.mjs" 2>/dev/null || true
 cat > ~/conector.sh <<'EOS'
 #!/data/data/com.termux/files/usr/bin/bash
 # Prende el conector y lo vuelve a abrir si se cae.
