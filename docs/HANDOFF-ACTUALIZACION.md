@@ -653,3 +653,6 @@ El usuario quiere ver todos esos contactos en el tablero.
   - chats con número: 337 en Carritos y 269 en Güemes (de 60 y 1 que había antes);
   - sin número: 171 en Carritos y 1548 en Güemes. Son chats `@lid` cuyo número WhatsApp no le pasó al conector; se completan cuando la persona escribe de nuevo;
   - una foto mandada desde el CRM salió bien.
+- **En el mismo PR:**
+  - **Hasta 30 fotos juntas:** el selector permite varias y se pueden pegar varias. Hay vista previa con ✕ por foto y "Sacar todas". Se suben de a una, con el texto solo en la primera; si una falla, quedan las que faltan. El conector deja 1 s entre foto y foto.
+  - **Número como título del chat:** a pedido del usuario. El nombre va chiquito abajo; si no se sabe el número, el título es el nombre.

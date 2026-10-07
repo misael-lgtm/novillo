@@ -365,6 +365,8 @@ async function tick() {
             mimetype: p.media_type || "image/jpeg",
           });
           sentFromCrm.add(sent.key.id);
+          // Cuando mandan muchas juntas, de a una con un respiro (como haría una persona).
+          await new Promise((r) => setTimeout(r, 1000));
           body = p.body?.trim() ? `📷 ${p.body.trim()}` : "📷 Foto";
           kind = "foto";
         } else {
