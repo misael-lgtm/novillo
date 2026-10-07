@@ -788,3 +788,17 @@ El usuario quiere ver todos esos contactos en el tablero.
   - Si entra uno nuevo: suena un "ding" (WebAudio, sin archivos) y aparece abajo a la derecha una tarjeta con nombre, monto, productos y los botones "💬 Escribirle" (abre el chat con el mensaje armado) y "Ver" (va a `/carritos` filtrado). Se muestran hasta 3 juntos.
 - `abandonedCarts` redondea `created_at_min` al día, para que la URL (y la caché) sea la misma todo el día.
 - `cartMessage()` arma el mensaje y lo usan la página y el aviso.
+
+## 35. PR siguiente (7/10): contador de mensajes de anuncios (pauta a mensajes)
+
+- **Pedido:** contar los mensajes que entran desde la pauta dirigida a mensajes. Por día, que se reinicie a las 00 y con un cuadrito "Ayer".
+- **Conector:**
+  - `adOf()` en mensajes.mjs (con tests) detecta en el `contextInfo` del mensaje: `externalAdReply.sourceType === "ad"` o `ctwaClid`, o `conversionSource` / `entryPointConversionSource` con la palabra "ad"/"ads". No cuenta `click_to_chat_link` (los wa.me) ni "broadcast".
+  - `toRow` agrega `ad_id`, `ad_title` y `ad_url` solo en los mensajes que nos mandan desde un anuncio, y el chat se marca con `wa_chats.from_ad_at` y `ad_title`.
+  - Las filas se guardan agrupadas por columnas, para que un lote mixto no pise con vacío la foto o el anuncio que ya estaban.
+- **Base:** migración `0017` (ya aplicada, por partes). La vista `wa_chat_list` se rehízo con `create or replace` y columnas explícitas (las nuevas al final), porque el `drop view` se colgaba con el CRM leyéndola todo el tiempo. Quedó una vista sobrante, `wa_chat_list_new`, que no se usa: borrarla cuando se pueda.
+- **CRM:**
+  - `getWaAdStats(line)` (ruta `/api/wa/anuncios`) cuenta hoy y ayer, con el día cortado a las 00 de Argentina, una vez por persona y por día, y separado por anuncio;
+  - en Teléfonos, `AdCounter` muestra "📣 Anuncios hoy: N" con el cuadrito "Ayer N" y, al tocarlo, el detalle por anuncio;
+  - en la lista de chats se ve el chip "📣 Anuncio".
+- **Arranca de cero:** solo cuenta desde que el celu tenga el conector actualizado.

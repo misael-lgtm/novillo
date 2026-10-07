@@ -17,6 +17,7 @@ import {
   type WaLineState,
   type WaMessage,
   type WaQuickReply,
+  type WaAdStats,
 } from "@/app/wa-actions";
 import { WaPicker, type PickerTab } from "./WaPicker";
 import { formatPhone } from "@/lib/rules";
@@ -364,6 +365,7 @@ export function WaInbox({
             Desvincular
           </button>
         )}
+        <AdCounter line={line} />
       </div>
       <div className="card grid h-[calc(100dvh-22rem)] min-h-[28rem] grid-cols-1 overflow-hidden shadow-sm md:grid-cols-[22rem_1fr]">
         <aside className={`flex min-h-0 flex-col border-stone-200 md:border-r ${open ? "hidden md:flex" : "flex"}`}>
@@ -454,7 +456,19 @@ export function WaInbox({
                       <span className="truncate font-semibold">{chatTitle(c)}</span>
                       <span className={`shrink-0 text-xs ${c.unread > 0 ? "font-semibold text-emerald-700" : "text-stone-500"}`}>{when(c.last_at)}</span>
                     </span>
-                    {chatSubtitle(c) && <span className="block truncate text-xs text-stone-500">{chatSubtitle(c)}</span>}
+                    {(chatSubtitle(c) || c.from_ad_at) && (
+                      <span className="flex items-center gap-1.5 text-xs text-stone-500">
+                        {c.from_ad_at && (
+                          <span
+                            className="shrink-0 rounded-full bg-amber-100 px-1.5 font-semibold text-amber-900"
+                            title={`Escribió desde el anuncio: ${c.ad_title ?? "sin nombre"}`}
+                          >
+                            📣 Anuncio
+                          </span>
+                        )}
+                        <span className="truncate">{chatSubtitle(c)}</span>
+                      </span>
+                    )}
                     <span className="flex items-center justify-between gap-2">
                       <span className={`truncate text-sm ${c.unread > 0 ? "font-medium text-stone-800" : "text-stone-500"}`}>{c.last_message}</span>
                       {c.unread > 0 && (
@@ -1103,5 +1117,71 @@ function MediaView({ m, onLoad }: { m: WaMessage; onLoad: () => void }) {
         onLoad={onLoad}
       />
     </a>
+  );
+}
+
+/** Mensajes de anuncios de Meta de hoy (se reinicia a las 00) y, al lado, los de ayer. Al tocarlo, el detalle por anuncio. */
+function AdCounter({ line }: { line: string }) {
+  const [stats, setStats] = useState<WaAdStats | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      getJson<WaAdStats | null>(`/api/wa/anuncios?line=${line}`)
+        .then((r) => alive && setStats(r))
+        .catch(() => {});
+    load();
+    const t = setInterval(() => document.visibilityState === "visible" && load(), 60_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [line]);
+  if (!stats) return null;
+  return (
+    <div className="relative ml-auto">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-2 rounded-full bg-amber-100 py-1 pl-3 pr-1 font-semibold text-amber-900 hover:bg-amber-200"
+        title="Mensajes que entraron desde anuncios de Meta (Instagram/Facebook). Se reinicia a las 00."
+      >
+        📣 Anuncios hoy:{" "}
+        <span className="text-base" aria-label="hoy">
+          {stats.today}
+        </span>
+        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-stone-600" aria-label="ayer">
+          Ayer {stats.yesterday}
+        </span>
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 z-30 mt-2 w-80 rounded-2xl border border-stone-200 bg-white p-3 text-sm shadow-xl"
+          role="dialog"
+          aria-label="Detalle por anuncio"
+        >
+          <p className="mb-2 grid grid-cols-[1fr_3rem_3rem] gap-2 text-xs font-semibold text-stone-500">
+            <span>Anuncio</span>
+            <span className="text-right">Hoy</span>
+            <span className="text-right">Ayer</span>
+          </p>
+          {stats.byAd.length ? (
+            <ul className="space-y-1">
+              {stats.byAd.map((a) => (
+                <li key={a.title} className="grid grid-cols-[1fr_3rem_3rem] gap-2">
+                  <span className="min-w-0 truncate">{a.title}</span>
+                  <b className="text-right">{a.today}</b>
+                  <span className="text-right text-stone-500">{a.yesterday}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-stone-500">Ni hoy ni ayer entraron mensajes desde anuncios.</p>
+          )}
+          <p className="mt-2 text-[11px] text-stone-500">Cuenta una vez por persona y por día. Empezó a contar cuando se actualizó el conector.</p>
+        </div>
+      )}
+    </div>
   );
 }

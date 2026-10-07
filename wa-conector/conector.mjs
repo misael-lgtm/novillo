@@ -150,9 +150,18 @@ async function saveMessages(line, msgs, { history = false, onDemand = false } = 
     line,
     rows.map((r) => r.jid),
   );
-  for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await db.from("wa_messages").upsert(rows.slice(i, i + 500), { onConflict: "line,id" });
-    if (error) log(line, "no se pudieron guardar mensajes:", error.message);
+  // Se guardan agrupadas por columnas: si en un mismo lote unas filas traen foto o anuncio y otras no,
+  // las que no lo traen pisarían con vacío lo que ya estaba guardado.
+  const groups = new Map();
+  for (const r of rows) {
+    const k = Object.keys(r).sort().join(",");
+    groups.set(k, [...(groups.get(k) ?? []), r]);
+  }
+  for (const group of groups.values()) {
+    for (let i = 0; i < group.length; i += 500) {
+      const { error } = await db.from("wa_messages").upsert(group.slice(i, i + 500), { onConflict: "line,id" });
+      if (error) log(line, "no se pudieron guardar mensajes:", error.message);
+    }
   }
   // Último mensaje de cada chat
   const last = new Map();
@@ -167,6 +176,10 @@ async function saveMessages(line, msgs, { history = false, onDemand = false } = 
       p_last_at: r.at,
     });
     if (error) log(line, "no se pudo actualizar el chat:", error.message);
+  }
+  // Chats que llegaron desde un anuncio: se marcan (📣 en el CRM).
+  for (const r of rows.filter((x) => x.ad_id)) {
+    await db.from("wa_chats").update({ from_ad_at: r.at, ad_title: r.ad_title }).eq("line", line).eq("jid", r.jid);
   }
 }
 

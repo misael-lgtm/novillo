@@ -3,7 +3,7 @@
 // WhatsApp de los locales: el CRM lee lo que guarda el conector (wa-conector/) y deja mensajes en la cola.
 
 import { PHONE_LINES } from "@/lib/config";
-import { normalizePhoneAR } from "@/lib/rules";
+import { normalizePhoneAR, todayAR } from "@/lib/rules";
 import { requireMember } from "@/lib/session";
 import type { ActionResult } from "@/lib/types";
 
@@ -29,6 +29,9 @@ export type WaChat = {
   unread: number;
   /** ids de las etiquetas de WhatsApp Business que tiene el chat */
   labels: string[];
+  /** Si la persona escribió desde un anuncio de Meta: cuándo y cuál. */
+  from_ad_at?: string | null;
+  ad_title?: string | null;
   customer: { id: string; name: string } | null;
 };
 
@@ -64,7 +67,7 @@ export async function getWaLine(line: string, q?: string, label?: string): Promi
 
   let query = supabase
     .from("wa_chat_list")
-    .select("jid, name, phone, last_message, last_at, unread, labels")
+    .select("jid, name, phone, last_message, last_at, unread, labels, from_ad_at, ad_title")
     .eq("line", line)
     .order("last_at", { ascending: false, nullsFirst: false })
     .limit(200);
@@ -109,6 +112,8 @@ export async function getWaLine(line: string, q?: string, label?: string): Promi
     first.unread += c.unread;
     first.labels = [...new Set([...first.labels, ...withPending(c)])];
     first.name ??= c.name;
+    first.from_ad_at ??= c.from_ad_at;
+    first.ad_title ??= c.ad_title;
   }
   return {
     state,
@@ -341,4 +346,51 @@ export async function deleteWaQuickReply(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("wa_quick_replies").delete().eq("id", id);
   if (error) return { ok: false, error: "No se pudo borrar." };
   return { ok: true };
+}
+
+// ── Anuncios ──────────────────────────────────────────────────
+
+export type WaAdStats = { today: number; yesterday: number; byAd: { title: string; today: number; yesterday: number }[] };
+
+/**
+ * Mensajes que entraron desde anuncios de Meta hoy y ayer (el día se corta a las 00, hora de Argentina).
+ * Cuenta una vez por persona y por día: si alguien manda 5 mensajes desde el anuncio, es 1.
+ */
+export async function getWaAdStats(line: string): Promise<WaAdStats | null> {
+  if (!validLine(line)) return null;
+  const { supabase } = await requireMember();
+  const startToday = Date.parse(`${todayAR()}T00:00:00-03:00`);
+  const startYesterday = startToday - 86400000;
+  const { data } = await supabase
+    .from("wa_messages")
+    .select("jid, at, ad_title")
+    .eq("line", line)
+    .not("ad_id", "is", null)
+    .gte("at", new Date(startYesterday).toISOString())
+    .limit(5000);
+  const seen = new Set<string>();
+  const byAd = new Map<string, { today: number; yesterday: number }>();
+  let today = 0;
+  let yesterday = 0;
+  for (const m of data ?? []) {
+    const isToday = Date.parse(m.at as string) >= startToday;
+    const key = `${isToday ? "hoy" : "ayer"}:${m.jid}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const title = (m.ad_title as string | null) ?? "Anuncio sin nombre";
+    const a = byAd.get(title) ?? { today: 0, yesterday: 0 };
+    if (isToday) {
+      today++;
+      a.today++;
+    } else {
+      yesterday++;
+      a.yesterday++;
+    }
+    byAd.set(title, a);
+  }
+  return {
+    today,
+    yesterday,
+    byAd: [...byAd].map(([title, n]) => ({ title, ...n })).sort((a, b) => b.today - a.today || b.yesterday - a.yesterday),
+  };
 }

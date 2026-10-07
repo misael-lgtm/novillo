@@ -145,6 +145,27 @@ export function statusOf(status) {
   return Number.isInteger(n) && n >= 2 && n <= 5 ? n : null;
 }
 
+/**
+ * Si el mensaje llegó desde un anuncio de Meta ("Enviar mensaje" en Instagram/Facebook): { id, title, url }.
+ * WhatsApp lo marca en el contextInfo (externalAdReply con sourceType "ad" o ctwaClid, o conversionSource de anuncios).
+ */
+export function adOf(message) {
+  const m = unwrap(message);
+  if (!m) return null;
+  for (const v of Object.values(m)) {
+    const ci = v && typeof v === "object" ? v.contextInfo : null;
+    if (!ci) continue;
+    const ear = ci.externalAdReply;
+    // "FB_Ads", "ctwa_ad"… (palabra "ad"/"ads" entera, para no confundir con "broadcast").
+    const adWord = /(^|[_\W])ads?($|[_\W])/i;
+    const fromAd = ear?.sourceType === "ad" || !!ear?.ctwaClid || adWord.test(ci.conversionSource ?? "") || adWord.test(ci.entryPointConversionSource ?? "");
+    if (!fromAd || ci.entryPointConversionSource === "click_to_chat_link") continue;
+    const title = (ear?.title || ear?.body || "").trim().slice(0, 200) || null;
+    return { id: ear?.sourceId || title || "anuncio", title, url: ear?.sourceUrl || null };
+  }
+  return null;
+}
+
 /** Fila de wa_messages, o null si el mensaje no va (grupo, reacción, etc.). */
 export function toRow(line, msg) {
   const jid = chatJid(msg?.key);
@@ -159,5 +180,12 @@ export function toRow(line, msg) {
     body: c.body.slice(0, 4000),
     kind: c.kind,
     at: dateOf(msg).toISOString(),
+    ...adFields(msg),
   };
+}
+
+/** Columnas del anuncio, solo en mensajes que nos mandan desde un anuncio. */
+function adFields(msg) {
+  const ad = msg.key?.fromMe ? null : adOf(msg.message);
+  return ad ? { ad_id: ad.id, ad_title: ad.title, ad_url: ad.url } : {};
 }
