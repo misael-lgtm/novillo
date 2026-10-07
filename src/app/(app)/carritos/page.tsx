@@ -20,7 +20,7 @@ function ago(iso: string) {
 export default async function CarritosPage({ searchParams }: { searchParams: Promise<{ q?: string; dias?: string }> }) {
   const { supabase, me } = await requireMember();
   const { q = "", dias } = await searchParams;
-  const days = [3, 7, 30].includes(Number(dias)) ? Number(dias) : 7;
+  const days = [3, 7, 30].includes(Number(dias)) ? Number(dias) : 30;
   const res = await abandonedCarts(30);
 
   if (!res || !res.ok) {
