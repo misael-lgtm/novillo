@@ -733,3 +733,12 @@ El usuario quiere ver todos esos contactos en el tablero.
 - **Causa 2, permisos fila por fila:** las políticas RLS llamaban `is_team_member()` / `is_admin()` / `current_member()` una vez por fila. La migración `0014_rls_rapido.sql` (ya aplicada) las reescribe todas como `(select public.fn())`, así se calculan una sola vez por consulta. Las reglas son las mismas. La consulta del tablero (9585 pedidos con su cliente) bajó de 408 a 216 ms en la base. Se agregaron los 3 índices de FK que marcaban los avisos.
 - **Si sigue lento:** el tablero trae todos los pedidos de una (el usuario pidió ver todas las tarjetas de Compró y Sin causa). La próxima mejora sería cargar esas columnas de a partes.
 - **Ojo con las pruebas:** `schema_test` pasa. Los scripts Playwright viejos (`e2e.mjs`, `board.mjs`, …) fallan también sin este cambio, porque dependen de datos sembrados que ya no están o de textos que cambiaron.
+
+## 30. PR siguiente (7/10): las conversaciones de WhatsApp no cargaban
+
+- **Causa:** las server actions de Next salen de a una, en fila. La lista de chats (cada 3 s), los mensajes (cada 3 s) y el festejo (Tiendanube, que puede tardar varios segundos) eran todas server actions, así que al abrir un chat el pedido de mensajes quedaba esperando detrás de las otras.
+- **Arreglo:**
+  - esas lecturas ahora son rutas GET y van en paralelo: `/api/wa/chats`, `/api/wa/mensajes` y `/api/ventas-off`. Usan las mismas funciones de `wa-actions.ts` / `goal-actions.ts`;
+  - `usePoll` no larga otra consulta si la anterior no volvió;
+  - mientras carga, la conversación muestra "Cargando mensajes…" (antes decía "Sin mensajes todavía").
+  - Las escrituras (mandar, etiquetar) siguen siendo server actions.
