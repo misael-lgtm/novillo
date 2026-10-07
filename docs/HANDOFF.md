@@ -434,7 +434,7 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
 7. 1/10/2026: los 2 pedidos de "Hablar de nuevo" (#8459, #8584) se pasaron a "Más adelante" por SQL a pedido del usuario, con su tarea "Volver a contactar" para el 31/10 (`created_by` = misael).
 8. 1/10/2026, **duplicados**: se archivaron (no borraron) 134 tarjetas de clientes que tenían más de una. Regla: si el cliente compró, quedan sus compras y se archiva todo lo demás (132 "Sin causa"); si no compró, queda la más avanzada/reciente (2 "Enviar nuevamente" repetidas). También se archivaron sus 2 tareas abiertas. Después, a pedido del usuario, también se archivaron las compras viejas de los 110 clientes que compraron varias veces (125 tarjetas); a cada uno le queda su compra más reciente. Resultado: **una tarjeta activa por cliente** (9.542 clientes = 9.542 tarjetas; Compró 2.083). Se ven en gris en la ficha del cliente y en Archivo; se pueden restaurar.
 
-**Historial de PRs:** #2 a #28, todos mergeados a `main`.
+**Historial de PRs:** #2 a #30, todos mergeados a `main`.
 - #2: casilla compartida + "¿Quién sos?".
 - #3: README con la URL.
 - #4: página de error de configuración.
@@ -461,6 +461,7 @@ Volver a correr `imp.run_cerrados()` no duplica pedidos, porque `source_ref` es 
 - #26: "fotito" (emoji) de cada vendedor, editable en Equipo (migración 0007).
 - #27: promo bancaria opcional al pasar a Compró y en el pedido (migración 0008).
 - #28: importar clientes de Tiendanube desde /tiendanube (migración 0009; clientes con solo mail).
+- #30: WhatsApp de los 3 locales adentro del CRM por QR, con conector en una compu del local (migración 0010, carpeta wa-conector/).
 
 ---
 

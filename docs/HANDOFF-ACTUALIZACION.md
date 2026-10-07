@@ -551,3 +551,51 @@ El usuario quiere ver todos esos contactos en el tablero.
   - repetir la importación no duplica nada;
   - la ficha de un cliente con solo mail abre bien.
 - **Estado:** falta que el usuario apriete el botón en producción. No se corrió desde acá porque el token está solo en Vercel.
+
+
+## 20. PR #30 (7/10): WhatsApp de los locales adentro del CRM (por QR, sin API)
+
+- **Qué pidió el usuario:** pestañas "Teléfono Carritos / Güemes / Palermo" con QR para vincular el WhatsApp Business de cada local y ver los chats **dentro del CRM**, "como Kommo", **sin la API oficial** y **sin contratar un servidor**.
+- **Solución:** un **conector** (`wa-conector/`) que corre en **una compu del local que queda prendida** (o un Android con Termux) y usa **Baileys 7** (`baileys@7.0.0-rc14`, protocolo de "Dispositivos vinculados").
+  - Un solo conector maneja los 3 teléfonos.
+  - Habla con el CRM **a través de la base**, con la service key, y Vercel no participa.
+  - Se le avisó al usuario que **no es la vía oficial**: hay riesgo de bloqueo si se usa para mensajes masivos.
+- **Base (migración `0010_whatsapp.sql`, ya aplicada en producción):**
+
+| Objeto | Qué guarda o hace |
+|---|---|
+| `wa_lines` | Estado, `qr`, `phone`, `command='desvincular'` y `seen_at` (latido cada 30 s) |
+| `wa_chats` | `last_message`, `last_at`, `read_at` |
+| `wa_messages` | Mensajes; PK `(line, id)` |
+| `wa_outbox` | Cola de lo que se manda desde el CRM |
+| `wa_chat_list` | Vista con la cantidad de sin leer |
+| `wa_touch_chat()` | Actualiza el chat sin pisar el último mensaje con historial viejo; solo la usa `service_role` |
+
+  - RLS: el equipo lee; marcar leído lo puede hacer cualquier miembro; insertar en la cola, cualquier miembro con `created_by = current_member()`; desvincular, solo el admin.
+  - Las **credenciales de WhatsApp quedan en la compu** (`wa-conector/sesiones/`, en el gitignore), no en la base.
+- **Conector:**
+  - `conector.mjs`:
+    - escribe el QR en `wa_lines`, guarda los mensajes (`messages.upsert` y `messaging-history.set` de los últimos `DIAS_DE_HISTORIAL`=30) y actualiza los chats;
+    - cada 2 s manda lo pendiente de `wa_outbox` y atiende "desvincular";
+    - si lo desvinculan, borra la sesión y pide un QR nuevo, y si se corta, reconecta.
+  - `mensajes.mjs` traduce el contenido (texto, 📷, 🎤, etc.). Ignora grupos, estados, canales y reacciones. Si el `@lid` trae `remoteJidAlt`, usa el número real.
+  - Tests: `node --test wa-conector/mensajes.test.mjs`. Ahora `npm test` corre también estos.
+  - Archivos para el local: `iniciar.bat` (instala la primera vez y reinicia solo si se cae), `.env.ejemplo` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LINEAS` opcional) y `LEEME.txt`.
+  - Se le mandó al usuario `wa-conector.zip` (sin claves).
+- **CRM:**
+  - `src/app/wa-actions.ts`: `getWaLine`, `getWaMessages` (marca leído e incluye lo que está en la cola), `sendWaMessage`, `startWaChat` (todavía sin uso en la interfaz) y `unlinkWaLine`.
+  - `src/components/WaInbox.tsx`, con 4 estados:
+    - "conector apagado", si `seen_at` tiene más de 2 minutos;
+    - QR (con la librería `qrcode`);
+    - "conectando";
+    - bandeja: lista de chats con búsqueda y sin leer, conversación, mandar (Enter), link a la ficha si el número coincide con un cliente y "Desvincular" para el admin.
+    - Se actualiza cada 3 s mientras la pestaña está a la vista.
+  - Rutas: `/telefonos/[linea]` (tabs) y `/telefonos/conector` (instructivo para Windows y Android).
+  - Menú: "📱 Teléfonos" en la compu y 📱 arriba en el celu. `PHONE_LINES` está en `config.ts`.
+- **Probado:**
+  - el parser con node:test (7 tests);
+  - la interfaz con Playwright, simulando lo que escribe el conector: QR, conector apagado, chats, unir con el cliente, marcar leído, mandar a la cola, que llegue un mensaje nuevo y la vista de celu.
+  - **No se pudo probar la conexión real con WhatsApp**: el proxy del contenedor bloquea whatsapp.com. La primera prueba real es en la compu del local.
+- **Pendiente:**
+  - el usuario tiene que instalar el conector: Node LTS, el zip, cargar la service_role en `.env` e `iniciar.bat`;
+  - después, escanear los 3 QR desde el CRM.

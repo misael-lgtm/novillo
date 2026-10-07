@@ -48,6 +48,9 @@ export function Nav({ name, isAdmin, shared }: { name: string; isAdmin: boolean;
             </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <Link href="/telefonos/carritos" className="text-lg md:hidden" aria-label="Teléfonos" title="Teléfonos">
+              📱
+            </Link>
             <ThemeToggle />
             {isAdmin && (
               <Link href="/equipo" className="text-stone-500 hover:text-stone-900">

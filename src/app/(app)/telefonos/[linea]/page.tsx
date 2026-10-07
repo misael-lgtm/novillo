@@ -1,17 +1,24 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PHONE_LINES } from "@/lib/config";
-import { WhatsAppLine } from "@/components/WhatsAppLine";
+import { requireMember } from "@/lib/session";
+import { WaInbox } from "@/components/WaInbox";
 
-/** Pestañas Carritos / Güemes / Palermo: abrir el WhatsApp Business Web de cada teléfono. */
+/** Pestañas Carritos / Güemes / Palermo: vincular por QR y chatear desde el CRM. */
 export default async function TelefonoPage({ params }: { params: Promise<{ linea: string }> }) {
   const { linea } = await params;
   const line = PHONE_LINES.find((l) => l.id === linea);
   if (!line) notFound();
+  const { me } = await requireMember();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
-      <h1 className="text-2xl font-bold">📱 Teléfonos</h1>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="mr-auto text-2xl font-bold">📱 Teléfonos</h1>
+        <Link href="/telefonos/conector" className="text-sm text-stone-500 underline">
+          Instalar el conector
+        </Link>
+      </div>
       <nav className="flex gap-1 rounded-xl bg-stone-100 p-1" aria-label="Teléfonos">
         {PHONE_LINES.map((l) => (
           <Link
@@ -24,7 +31,7 @@ export default async function TelefonoPage({ params }: { params: Promise<{ linea
           </Link>
         ))}
       </nav>
-      <WhatsAppLine id={line.id} label={line.label} short={line.short} />
+      <WaInbox line={line.id} short={line.short} isAdmin={me.is_admin} connectorHelp="/telefonos/conector" />
     </div>
   );
 }
