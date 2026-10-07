@@ -599,3 +599,20 @@ El usuario quiere ver todos esos contactos en el tablero.
 - **Pendiente:**
   - el usuario tiene que instalar el conector: Node LTS, el zip, cargar la service_role en `.env` e `iniciar.bat`;
   - después, escanear los 3 QR desde el CRM.
+
+
+## 21. PR #31 (7/10): instalador de una línea para Android
+
+- **Por qué:** al usuario se le complicaba instalar en el celu paso a paso.
+- **Cómo es ahora:** en Termux se pega una sola línea: `curl -fsSL https://wayfarer-crm.vercel.app/conector/android.sh | bash`.
+- **Qué hace el script** (`public/conector/android.sh`):
+  - instala nodejs-lts sin preguntas;
+  - baja `public/conector/wa-conector.zip` y lo descomprime (si ya había `.env`, lo respeta);
+  - corre `npm install`;
+  - pide la service_role una sola vez (leyéndola de `/dev/tty`);
+  - crea `~/conector.sh` (wake-lock y reinicio si se cae) y lo copia en `~/.termux/boot/` para Termux:Boot;
+  - y arranca el conector.
+- **Ruta pública:** `/conector/` es pública, el middleware la excluye del login. Contiene solo el instalador y el zip, sin claves.
+- **Ojo con el zip:** `public/conector/wa-conector.zip` hay que **regenerarlo a mano** si cambia `wa-conector/`. Lleva conector.mjs, mensajes.mjs, package.json, package-lock.json, .env.ejemplo, `.env` en blanco, iniciar.bat y LEEME.txt.
+- **Instructivo:** `/telefonos/conector` ahora tiene la línea para copiar y el link directo al zip para PC.
+- **Probado:** el instalador se corrió en el contenedor con apt/pkg/termux simulados. Llega hasta "No cierres esta ventana", y se probó aparte que guarda la clave. **No se probó en un Android real.**
