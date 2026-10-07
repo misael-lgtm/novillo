@@ -64,12 +64,126 @@ const labelColor = (l?: WaLabel) => (l?.color != null ? LABEL_COLORS[l.color % L
 
 function LabelChip({ label }: { label: WaLabel }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-700">
+    <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-700">
       <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: labelColor(label) }} aria-hidden />
       {label.name}
     </span>
   );
 }
+
+// Colores de las fotitos (de la paleta: en modo oscuro se invierten solos).
+const AVATAR_COLORS = [
+  "bg-emerald-100 text-emerald-800",
+  "bg-sky-100 text-sky-800",
+  "bg-violet-100 text-violet-800",
+  "bg-amber-100 text-amber-800",
+  "bg-rose-100 text-rose-800",
+  "bg-teal-100 text-teal-800",
+  "bg-pink-100 text-pink-800",
+  "bg-orange-100 text-orange-800",
+];
+
+/** Círculo con las iniciales del nombre (o 👤 si solo hay número), siempre del mismo color para el mismo chat. */
+function Avatar({ chat, size = "md" }: { chat: WaChat; size?: "md" | "sm" }) {
+  const name = chat.customer?.name ?? chat.name;
+  const initials = name
+    ?.replace(/[^\p{L}\p{N}\s]/gu, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
+  let h = 0;
+  for (const ch of chat.jid) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-full font-bold ${AVATAR_COLORS[h % AVATAR_COLORS.length]} ${
+        size === "sm" ? "h-10 w-10 text-sm" : "h-11 w-11 text-sm"
+      }`}
+      aria-hidden
+    >
+      {initials || <PersonIcon />}
+    </span>
+  );
+}
+
+const svg = {
+  width: 20,
+  height: 20,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+} as const;
+const PersonIcon = () => (
+  <svg {...svg} width={18} height={18}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+  </svg>
+);
+const SearchIcon = () => (
+  <svg {...svg} width={16} height={16}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </svg>
+);
+const SendIcon = () => (
+  <svg {...svg}>
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </svg>
+);
+const PhotoIcon = () => (
+  <svg {...svg}>
+    <rect x="3" y="5" width="18" height="15" rx="3" />
+    <circle cx="9" cy="11" r="2" />
+    <path d="m21 17-5-5-8 8" />
+  </svg>
+);
+const TagIcon = () => (
+  <svg {...svg} width={16} height={16}>
+    <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" />
+    <circle cx="8" cy="8" r="1.5" />
+  </svg>
+);
+const BackIcon = () => (
+  <svg {...svg}>
+    <path d="M15 6l-6 6 6 6" />
+  </svg>
+);
+/** Tilde de enviado (dos tildes cuando ya salió por WhatsApp). */
+const Ticks = () => (
+  <svg
+    viewBox="0 0 18 12"
+    width={15}
+    height={10}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-label="enviado"
+  >
+    <path d="m1 6.5 3.5 3.5L11 2.5M7.5 10 14 2.5" />
+  </svg>
+);
+
+/** "Hoy", "Ayer" o la fecha, para separar los mensajes por día. */
+function dayLabel(iso: string) {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(Date.now() - 86400000);
+  if (d.toDateString() === today.toDateString()) return "Hoy";
+  if (d.toDateString() === yesterday.toDateString()) return "Ayer";
+  return d.toLocaleDateString("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    ...(d.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {}),
+  });
+}
+const hourOf = (iso: string) => new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
 
 /** El número de WhatsApp primero; el nombre solo si no se sabe el número. */
 const chatTitle = (c: WaChat) => (c.phone ? formatPhone(c.phone) : (c.customer?.name ?? c.name ?? "Sin número"));
@@ -147,8 +261,12 @@ export function WaInbox({ line, short, isAdmin, connectorHelp }: { line: string;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="rounded-full bg-emerald-100 px-3 py-1 font-semibold text-emerald-900">
-          ✔ Vinculado{state.phone ? ` · ${formatPhone(state.phone)}` : ""}
+        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 font-semibold text-emerald-900">
+          <span className="relative flex h-2 w-2" aria-hidden>
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-600" />
+          </span>
+          Vinculado{state.phone ? ` · ${formatPhone(state.phone)}` : ""}
         </span>
         {isAdmin && (
           <button
@@ -161,10 +279,19 @@ export function WaInbox({ line, short, isAdmin, connectorHelp }: { line: string;
           </button>
         )}
       </div>
-      <div className="card grid h-[calc(100dvh-24rem)] min-h-96 grid-cols-1 overflow-hidden md:grid-cols-[20rem_1fr]">
+      <div className="card grid h-[calc(100dvh-22rem)] min-h-[28rem] grid-cols-1 overflow-hidden shadow-sm md:grid-cols-[22rem_1fr]">
         <aside className={`flex min-h-0 flex-col border-stone-200 md:border-r ${open ? "hidden md:flex" : "flex"}`}>
-          <div className="space-y-2 border-b border-stone-200 p-2">
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre o número…" className="input py-2" aria-label="Buscar chat" />
+          <div className="space-y-2.5 border-b border-stone-200 p-3">
+            <label className="flex items-center gap-2 rounded-full bg-stone-100 px-3.5 py-2 text-stone-500 focus-within:ring-2 focus-within:ring-emerald-400">
+              <SearchIcon />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar nombre o número…"
+                className="min-w-0 flex-1 bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-500"
+                aria-label="Buscar chat"
+              />
+            </label>
             {labels.length > 0 && (
               <div className="flex gap-1.5 overflow-x-auto pb-0.5" role="group" aria-label="Filtrar por etiqueta">
                 {[{ id: "", name: "Todos", color: null } as WaLabel, ...labels].map((l) => (
@@ -172,8 +299,8 @@ export function WaInbox({ line, short, isAdmin, connectorHelp }: { line: string;
                     key={l.id || "todos"}
                     onClick={() => setFilter(l.id)}
                     aria-pressed={filter === l.id}
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                      filter === l.id ? "border-stone-800 bg-stone-800 text-white" : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                      filter === l.id ? "bg-emerald-600 text-white shadow-sm" : "bg-stone-100 text-stone-700 hover:bg-stone-200"
                     }`}
                   >
                     {l.id && <span className="h-2 w-2 rounded-full" style={{ background: labelColor(l) }} aria-hidden />}
@@ -183,7 +310,7 @@ export function WaInbox({ line, short, isAdmin, connectorHelp }: { line: string;
               </div>
             )}
           </div>
-          <ul className="min-h-0 flex-1 divide-y divide-stone-100 overflow-y-auto">
+          <ul className="min-h-0 flex-1 overflow-y-auto">
             {chats.map((c) => (
               <li key={c.jid}>
                 <button
@@ -191,17 +318,22 @@ export function WaInbox({ line, short, isAdmin, connectorHelp }: { line: string;
                     setOpenJid(c.jid);
                     setOpenChat(c);
                   }}
-                  className={`flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-stone-50 ${open?.jid === c.jid ? "bg-stone-100" : ""}`}
+                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-stone-50 ${open?.jid === c.jid ? "bg-emerald-50 hover:bg-emerald-50" : ""}`}
                 >
-                  <span className="min-w-0 flex-1">
+                  <Avatar chat={c} />
+                  <span className="min-w-0 flex-1 border-b border-stone-100 pb-2.5">
                     <span className="flex items-baseline justify-between gap-2">
                       <span className="truncate font-semibold">{chatTitle(c)}</span>
-                      <span className="shrink-0 text-xs text-stone-500">{when(c.last_at)}</span>
+                      <span className={`shrink-0 text-xs ${c.unread > 0 ? "font-semibold text-emerald-700" : "text-stone-500"}`}>{when(c.last_at)}</span>
                     </span>
                     {chatSubtitle(c) && <span className="block truncate text-xs text-stone-500">{chatSubtitle(c)}</span>}
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm text-stone-500">{c.last_message}</span>
-                      {c.unread > 0 && <span className="shrink-0 rounded-full bg-emerald-500 px-1.5 text-xs font-bold text-white">{c.unread}</span>}
+                      <span className={`truncate text-sm ${c.unread > 0 ? "font-medium text-stone-800" : "text-stone-500"}`}>{c.last_message}</span>
+                      {c.unread > 0 && (
+                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[11px] font-bold text-white">
+                          {c.unread}
+                        </span>
+                      )}
                     </span>
                     {c.labels.length > 0 && (
                       <span className="mt-1 flex flex-wrap gap-1">
@@ -215,14 +347,20 @@ export function WaInbox({ line, short, isAdmin, connectorHelp }: { line: string;
                 </button>
               </li>
             ))}
-            {!chats.length && <li className="p-4 text-center text-sm text-stone-500">{q || filter ? "No hay chats con eso." : "Todavía no hay chats."}</li>}
+            {!chats.length && <li className="p-8 text-center text-sm text-stone-500">{q || filter ? "No hay chats con eso." : "Todavía no hay chats."}</li>}
           </ul>
         </aside>
         <section className={`min-h-0 flex-col ${open ? "flex" : "hidden md:flex"}`}>
           {open ? (
             <Conversation key={open.jid} line={line} chat={open} labels={labels} onBack={() => setOpenJid(null)} onSent={load} />
           ) : (
-            <div className="m-auto p-6 text-center text-sm text-stone-500">Elegí un chat de la lista.</div>
+            <div className="m-auto max-w-xs p-6 text-center text-stone-500">
+              <p className="text-5xl" aria-hidden>
+                💬
+              </p>
+              <p className="mt-3 font-semibold text-stone-700">WhatsApp de {short}</p>
+              <p className="mt-1 text-sm">Elegí un chat de la lista para ver la conversación y responder desde acá.</p>
+            </div>
           )}
         </section>
       </div>
@@ -369,20 +507,22 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
 
   const title = chatTitle(chat);
   const subtitle = chatSubtitle(chat);
+  const canSend = !sending && (!!text.trim() || photos.length > 0);
   return (
     <>
-      <header className="flex items-center gap-3 border-b border-stone-200 px-3 py-2.5">
-        <button onClick={onBack} className="text-lg md:hidden" aria-label="Volver a la lista">
-          ←
+      <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-3 py-2.5">
+        <button onClick={onBack} className="-ml-1 rounded-full p-1 text-stone-600 hover:bg-stone-100 md:hidden" aria-label="Volver a la lista">
+          <BackIcon />
         </button>
+        <Avatar chat={chat} size="sm" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{title}</p>
+          <p className="truncate font-semibold leading-tight">{title}</p>
           <p className="truncate text-xs text-stone-500">
             {subtitle ?? ""}
             {chat.customer ? (
               <>
                 {subtitle ? " · " : ""}
-                <Link href={`/clientes/${chat.customer.id}`} className="underline">
+                <Link href={`/clientes/${chat.customer.id}`} className="font-medium text-emerald-700 hover:underline">
                   ver ficha en el CRM
                 </Link>
               </>
@@ -390,7 +530,7 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
               chat.phone && (
                 <>
                   {subtitle ? " · " : ""}
-                  <Link href={`/pedidos/nuevo`} className="underline">
+                  <Link href={`/pedidos/nuevo`} className="font-medium text-emerald-700 hover:underline">
                     no está en el CRM: cargar pedido
                   </Link>
                 </>
@@ -408,66 +548,118 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
         </div>
         {labels.length > 0 && (
           <div className="relative shrink-0">
-            <button onClick={() => setLabelsOpen((v) => !v)} aria-expanded={labelsOpen} className="btn-secondary px-2.5 py-1.5 text-sm">
-              🏷️ Etiquetar
+            <button
+              onClick={() => setLabelsOpen((v) => !v)}
+              aria-expanded={labelsOpen}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                labelsOpen ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-700 hover:bg-stone-200"
+              }`}
+            >
+              <TagIcon />
+              Etiquetar
             </button>
             {labelsOpen && (
               <div
-                className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-stone-200 bg-white p-1 shadow-lg"
+                className="absolute right-0 z-20 mt-2 max-h-80 w-60 overflow-y-auto rounded-2xl border border-stone-200 bg-white p-1.5 shadow-xl"
                 role="group"
                 aria-label="Etiquetas del chat"
               >
                 {labels.map((l) => {
                   const on = chat.labels.includes(l.id);
                   return (
-                    <label key={l.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-stone-50">
-                      <input type="checkbox" checked={on} onChange={() => toggleLabel(l.id, !on)} />
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: labelColor(l) }} aria-hidden />
+                    <label
+                      key={l.id}
+                      className={`flex cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm hover:bg-stone-50 ${on ? "font-semibold" : ""}`}
+                    >
+                      <input type="checkbox" checked={on} onChange={() => toggleLabel(l.id, !on)} className="accent-emerald-600" />
+                      <span className="h-3 w-3 rounded-full" style={{ background: labelColor(l) }} aria-hidden />
                       {l.name}
                     </label>
                   );
                 })}
-                <p className="px-2 pb-1 pt-1.5 text-[11px] text-stone-500">También se cambia en el WhatsApp del celu.</p>
+                <p className="px-2.5 pb-1 pt-2 text-[11px] text-stone-500">También se cambia en el WhatsApp del celu.</p>
               </div>
             )}
           </div>
         )}
       </header>
       <div
-        className="min-h-0 flex-1 space-y-1.5 overflow-y-auto bg-stone-50 p-3"
+        className="wa-messages min-h-0 flex-1 overflow-y-auto bg-stone-100 px-3 py-4 md:px-8"
+        style={{ backgroundImage: "radial-gradient(var(--color-stone-200, #e7e5e4) 1px, transparent 1px)", backgroundSize: "18px 18px" }}
         onScroll={(e) => {
           const el = e.currentTarget;
           atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
       >
-        {msgs.map((m) => (
-          <div key={m.id} className={`flex ${m.from_me ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-sm shadow-sm ${
-                m.from_me ? "rounded-br-sm bg-emerald-100 text-emerald-950" : "rounded-bl-sm bg-white"
-              } ${m.pending ? "opacity-70" : ""}`}
-            >
-              {m.media_path && (
-                <a href={photoUrl(m.media_path)} target="_blank" rel="noreferrer" className="-mx-1 mb-1 block">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={photoUrl(m.media_path)}
-                    alt="Foto"
-                    loading="lazy"
-                    className="max-h-72 rounded-xl"
-                    // Al cargar la foto el chat crece: seguir abajo si estaba abajo.
-                    onLoad={() => atBottom.current && bottom.current?.scrollIntoView({ block: "end" })}
-                  />
-                </a>
+        {msgs.map((m, i) => {
+          const prev = msgs[i - 1];
+          const newDay = !prev || new Date(prev.at).toDateString() !== new Date(m.at).toDateString();
+          const firstOfGroup = newDay || prev.from_me !== m.from_me;
+          const text = m.media_path ? (m.body ?? "").replace(/^📷\s?(Foto$)?/, "") : m.body;
+          return (
+            <div key={m.id}>
+              {newDay && (
+                <div className="my-3 flex justify-center first:mt-0">
+                  <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-stone-600 shadow-sm first-letter:uppercase">
+                    {dayLabel(m.at)}
+                  </span>
+                </div>
               )}
-              {m.media_path ? (m.body ?? "").replace(/^📷\s?(Foto$)?/, "") : m.body}
-              <span className="ml-2 inline-block text-[10px] text-stone-500">
-                {m.error ? <span className="text-rose-700">✗ no salió</span> : m.pending ? "⏳" : when(m.at)}
-              </span>
+              <div className={`flex ${m.from_me ? "justify-end" : "justify-start"} ${firstOfGroup ? "mt-2" : "mt-0.5"}`}>
+                <div
+                  className={`relative max-w-[85%] whitespace-pre-wrap break-words rounded-2xl text-[15px] leading-snug shadow-sm md:max-w-[65%] ${
+                    m.from_me ? "bg-emerald-100 text-stone-900" : "bg-white text-stone-900"
+                  } ${firstOfGroup ? (m.from_me ? "rounded-tr-md" : "rounded-tl-md") : ""} ${m.pending ? "opacity-75" : ""} ${
+                    m.media_path ? "p-1" : "px-3 py-1.5"
+                  }`}
+                >
+                  {m.media_path && (
+                    <a href={photoUrl(m.media_path)} target="_blank" rel="noreferrer" className="block">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photoUrl(m.media_path)}
+                        alt="Foto"
+                        loading="lazy"
+                        className="max-h-80 min-h-24 min-w-40 rounded-xl bg-stone-200 object-cover"
+                        // Al cargar la foto el chat crece: seguir abajo si estaba abajo.
+                        onLoad={() => atBottom.current && bottom.current?.scrollIntoView({ block: "end" })}
+                      />
+                    </a>
+                  )}
+                  <span className={m.media_path ? (text ? "block px-2 pb-1 pt-1.5" : "") : ""}>
+                    {text}
+                    {/* Hueco para que la hora no pise el texto */}
+                    <span className="inline-block w-16" aria-hidden />
+                  </span>
+                  <span
+                    className={`absolute bottom-1 right-2 flex items-center gap-1 text-[11px] ${
+                      m.media_path && !text ? "rounded-full bg-black/45 px-1.5 py-0.5 text-[#fff]" : "text-stone-500"
+                    }`}
+                  >
+                    {m.error ? (
+                      <span className="font-semibold text-rose-700">✗ no salió</span>
+                    ) : (
+                      <>
+                        {hourOf(m.at)}
+                        {m.from_me &&
+                          (m.pending ? (
+                            <span aria-label="enviando">🕓</span>
+                          ) : (
+                            <span className="text-sky-600">
+                              <Ticks />
+                            </span>
+                          ))}
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
-        {!msgs.length && <p className="pt-6 text-center text-sm text-stone-500">Sin mensajes todavía.</p>}
+          );
+        })}
+        {!msgs.length && (
+          <p className="mx-auto mt-6 w-fit rounded-full bg-white/90 px-4 py-1.5 text-center text-sm text-stone-500 shadow-sm">Sin mensajes todavía.</p>
+        )}
         <div ref={bottom} />
       </div>
       <form
@@ -475,20 +667,20 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
           e.preventDefault();
           send();
         }}
-        className="border-t border-stone-200 p-2"
+        className="border-t border-stone-200 bg-stone-50 px-2 py-2 md:px-3"
       >
         {photos.length > 0 && (
-          <div className="mb-2">
+          <div className="mb-2 rounded-2xl bg-white p-2 shadow-sm">
             <div className="flex gap-2 overflow-x-auto pb-1">
               {photos.map((p, i) => (
                 <div key={p.url} className="relative shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.url} alt="Foto para mandar" className="h-20 rounded-lg border border-stone-200" />
+                  <img src={p.url} alt="Foto para mandar" className="h-20 w-20 rounded-xl object-cover" />
                   {!sending && (
                     <button
                       type="button"
                       onClick={() => removePhoto(i)}
-                      className="absolute right-1 top-1 rounded-full bg-black/60 px-1.5 text-xs font-bold text-white"
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[11px] font-bold text-[#fff] hover:bg-black/80"
                       aria-label={`Sacar foto ${i + 1}`}
                     >
                       ✕
@@ -496,8 +688,18 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
                   )}
                 </div>
               ))}
+              {photos.length < MAX_PHOTOS && !sending && (
+                <button
+                  type="button"
+                  onClick={() => fileInput.current?.click()}
+                  className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-stone-300 text-2xl text-stone-400 hover:border-emerald-400 hover:text-emerald-600"
+                  aria-label="Agregar más fotos"
+                >
+                  +
+                </button>
+              )}
             </div>
-            <p className="text-xs text-stone-500">
+            <p className="px-1 text-xs text-stone-500">
               {progress ?? `${photos.length} ${photos.length === 1 ? "foto" : "fotos"} (hasta ${MAX_PHOTOS}).`}{" "}
               {!sending && (
                 <button
@@ -506,7 +708,7 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
                     photos.forEach((p) => URL.revokeObjectURL(p.url));
                     setPhotos([]);
                   }}
-                  className="underline"
+                  className="font-medium underline"
                 >
                   Sacar todas
                 </button>
@@ -527,38 +729,46 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
               e.target.value = "";
             }}
           />
+          <div className="flex min-h-11 flex-1 items-end rounded-3xl bg-white px-1.5 shadow-sm ring-1 ring-stone-200 focus-within:ring-2 focus-within:ring-emerald-400">
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className="m-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-stone-500 hover:bg-stone-100 hover:text-emerald-700"
+              aria-label="Mandar fotos"
+              title="Mandar fotos (hasta 30)"
+            >
+              <PhotoIcon />
+            </button>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              onPaste={(e) => {
+                const files = [...e.clipboardData.files].filter((x) => x.type.startsWith("image/"));
+                if (files.length) {
+                  e.preventDefault();
+                  pickPhotos(files);
+                }
+              }}
+              rows={1}
+              placeholder={photos.length ? "Texto para la primera foto (opcional)" : "Escribí un mensaje"}
+              className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-1 py-2.5 text-[15px] outline-none placeholder:text-stone-500"
+              aria-label="Mensaje"
+            />
+          </div>
           <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            className="btn-secondary px-3 py-2"
-            aria-label="Mandar fotos"
-            title="Mandar fotos (hasta 30)"
+            type="submit"
+            disabled={!canSend}
+            aria-label="Mandar"
+            title="Mandar (Enter)"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            📷
-          </button>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            onPaste={(e) => {
-              const files = [...e.clipboardData.files].filter((x) => x.type.startsWith("image/"));
-              if (files.length) {
-                e.preventDefault();
-                pickPhotos(files);
-              }
-            }}
-            rows={1}
-            placeholder={photos.length ? "Texto para la primera foto (opcional)" : "Escribí un mensaje (Enter manda, Shift+Enter baja de línea)"}
-            className="input max-h-32 min-h-10 flex-1 resize-y py-2"
-            aria-label="Mensaje"
-          />
-          <button type="submit" disabled={sending || (!text.trim() && !photos.length)} className="btn-primary py-2">
-            {sending ? "…" : "Mandar"}
+            {sending ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <SendIcon />}
           </button>
         </div>
       </form>

@@ -664,3 +664,16 @@ El usuario quiere ver todos esos contactos en el tablero.
   - el navegador sube directo a Storage (`createClient()` de `supabase/client`), de a 4 a la vez y con un reintento, a `out/<línea>/<uuid>.jpg`. La política `wa_media_upload` lo permite;
   - después `queueWaPhotos(line, jid, caption, paths)` valida las rutas y mete todas en la cola de una. Cada una lleva 1 ms más de `created_at`, así salen en orden;
   - se sacó `sendWaPhoto` y `next.config.ts` volvió a estar vacío.
+
+## 25. PR siguiente (7/10): diseño nuevo de Teléfonos
+
+- **Por qué:** el usuario pidió "que la estética fuera más copada".
+- **Qué cambió en `WaInbox`:**
+  - fotitos con iniciales y color fijo por chat (o 👤 si no hay nombre);
+  - buscador redondo y filtros en verde;
+  - fila con no leídos en negrita y la hora en verde;
+  - fondo del chat con puntitos;
+  - globitos con colita, hora y ✓✓ adentro, agrupados por remitente, con separadores "Hoy" / "Ayer" / fecha;
+  - barra de escribir redonda, con ícono de foto y botón verde de enviar;
+  - menú de etiquetas más lindo y una pantalla vacía con 💬.
+- **Modo oscuro:** sale solo por la inversión de la paleta. Lo que va sobre fondo negro fijo usa `text-[#fff]`.
