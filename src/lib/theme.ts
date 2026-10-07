@@ -1,4 +1,5 @@
-export const THEME_KEY = "crm_theme";
+// Clave nueva (antes "crm_theme"): así todos arrancan en oscuro aunque antes hayan elegido claro.
+export const THEME_KEY = "crm_tema";
 
-/** Se corre en <head> antes de pintar, así no parpadea al cargar. Sin elección guardada, sigue al sistema. */
-export const themeInitScript = `try{var t=localStorage.getItem("${THEME_KEY}");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`;
+/** Se corre en <head> antes de pintar, así no parpadea al cargar. Por defecto, modo oscuro (salvo que elijan claro con ☀️/🌙). */
+export const themeInitScript = `try{if(localStorage.getItem("${THEME_KEY}")!=="light")document.documentElement.classList.add("dark")}catch(e){document.documentElement.classList.add("dark")}`;

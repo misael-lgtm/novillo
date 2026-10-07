@@ -7,14 +7,18 @@ import {
   getWaLine,
   getWaMessages,
   sendWaMessage,
+  getWaQuickReplies,
   queueWaPhotos,
+  queueWaSticker,
   setWaChatLabel,
   unlinkWaLine,
   type WaChat,
   type WaLabel,
   type WaLineState,
   type WaMessage,
+  type WaQuickReply,
 } from "@/app/wa-actions";
+import { WaPicker, type PickerTab } from "./WaPicker";
 import { formatPhone } from "@/lib/rules";
 import { createClient } from "@/lib/supabase/client";
 
@@ -183,6 +187,24 @@ function dayLabel(iso: string) {
     ...(d.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {}),
   });
 }
+/** El texto que va abajo del archivo (sin el "📷 Foto", "🎤 Audio", etc. que se guarda para la lista). */
+function mediaCaption(m: WaMessage) {
+  const body = m.body ?? "";
+  if (m.kind === "foto") return body.replace(/^📷\s?(Foto$)?/u, "");
+  if (m.kind === "video") return body.replace(/^🎥\s?(Video$)?/u, "");
+  if (m.kind === "documento") return "";
+  return m.kind === "sticker" || m.kind === "audio" ? "" : body;
+}
+
+const SmileIcon = () => (
+  <svg {...svg}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8.5 14.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8" />
+    <circle cx="9" cy="10" r=".8" fill="currentColor" />
+    <circle cx="15" cy="10" r=".8" fill="currentColor" />
+  </svg>
+);
+
 const hourOf = (iso: string) => new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
 
 /** El número de WhatsApp primero; el nombre solo si no se sabe el número. */
@@ -407,6 +429,45 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
   const [labelsOpen, setLabelsOpen] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const textArea = useRef<HTMLTextAreaElement>(null);
+  const [picker, setPicker] = useState<PickerTab | null>(null);
+  const [replies, setReplies] = useState<WaQuickReply[]>([]);
+  const [slashPick, setSlashPick] = useState(0);
+  const loadReplies = useCallback(() => {
+    getWaQuickReplies().then(setReplies);
+  }, []);
+  useEffect(loadReplies, [loadReplies]);
+
+  // "/atajo": sugerir respuestas rápidas mientras se escribe.
+  const slash = /^\/(\S*)$/.exec(text);
+  const slashMatches = slash ? replies.filter((r) => r.shortcut.includes(slash[1].toLowerCase())).slice(0, 6) : [];
+  function useReply(r: WaQuickReply) {
+    setText(r.body);
+    setPicker(null);
+    setSlashPick(0);
+    requestAnimationFrame(() => textArea.current?.focus());
+  }
+
+  /** Mete un emoji donde está el cursor. */
+  function insertEmoji(e: string) {
+    const el = textArea.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? text.length;
+    setText(text.slice(0, start) + e + text.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + e.length, start + e.length);
+    });
+  }
+
+  async function sendSticker(path: string) {
+    setPicker(null);
+    setError(null);
+    const r = await queueWaSticker(line, chat.jid, path);
+    if (!r.ok) return setError(r.error);
+    load();
+    onSent();
+  }
   const lastCount = useRef(0);
   const atBottom = useRef(true);
 
@@ -595,7 +656,8 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
           const prev = msgs[i - 1];
           const newDay = !prev || new Date(prev.at).toDateString() !== new Date(m.at).toDateString();
           const firstOfGroup = newDay || prev.from_me !== m.from_me;
-          const text = m.media_path ? (m.body ?? "").replace(/^📷\s?(Foto$)?/, "") : m.body;
+          const text = m.media_path ? mediaCaption(m) : m.body;
+          const sticker = m.kind === "sticker" && !!m.media_path;
           return (
             <div key={m.id}>
               {newDay && (
@@ -607,25 +669,13 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
               )}
               <div className={`flex ${m.from_me ? "justify-end" : "justify-start"} ${firstOfGroup ? "mt-2" : "mt-0.5"}`}>
                 <div
-                  className={`relative max-w-[85%] whitespace-pre-wrap break-words rounded-2xl text-[15px] leading-snug shadow-sm md:max-w-[65%] ${
-                    m.from_me ? "bg-emerald-100 text-stone-900" : "bg-white text-stone-900"
-                  } ${firstOfGroup ? (m.from_me ? "rounded-tr-md" : "rounded-tl-md") : ""} ${m.pending ? "opacity-75" : ""} ${
+                  className={`relative max-w-[85%] whitespace-pre-wrap break-words rounded-2xl text-[15px] leading-snug md:max-w-[65%] ${
+                    sticker ? "pb-6" : `${m.from_me ? "bg-emerald-100" : "bg-white"} text-stone-900 shadow-sm`
+                  } ${firstOfGroup && !sticker ? (m.from_me ? "rounded-tr-md" : "rounded-tl-md") : ""} ${m.pending ? "opacity-75" : ""} ${
                     m.media_path ? "p-1" : "px-3 py-1.5"
                   }`}
                 >
-                  {m.media_path && (
-                    <a href={photoUrl(m.media_path)} target="_blank" rel="noreferrer" className="block">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={photoUrl(m.media_path)}
-                        alt="Foto"
-                        loading="lazy"
-                        className="max-h-80 min-h-24 min-w-40 rounded-xl bg-stone-200 object-cover"
-                        // Al cargar la foto el chat crece: seguir abajo si estaba abajo.
-                        onLoad={() => atBottom.current && bottom.current?.scrollIntoView({ block: "end" })}
-                      />
-                    </a>
-                  )}
+                  {m.media_path && <MediaView m={m} onLoad={() => atBottom.current && bottom.current?.scrollIntoView({ block: "end" })} />}
                   <span className={m.media_path ? (text ? "block px-2 pb-1 pt-1.5" : "") : ""}>
                     {text}
                     {/* Hueco para que la hora no pise el texto */}
@@ -633,7 +683,9 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
                   </span>
                   <span
                     className={`absolute bottom-1 right-2 flex items-center gap-1 text-[11px] ${
-                      m.media_path && !text ? "rounded-full bg-black/45 px-1.5 py-0.5 text-[#fff]" : "text-stone-500"
+                      m.media_path && !text && (m.kind === "foto" || m.kind === "video" || sticker)
+                        ? "rounded-full bg-black/45 px-1.5 py-0.5 text-[#fff]"
+                        : "text-stone-500"
                     }`}
                   >
                     {m.error ? (
@@ -716,6 +768,44 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
             </p>
           </div>
         )}
+        {slashMatches.length > 0 && (
+          <ul className="mb-2 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-lg" role="listbox" aria-label="Respuestas rápidas">
+            {slashMatches.map((r, i) => (
+              <li key={r.id} role="option" aria-selected={i === slashPick}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => useReply(r)}
+                  className={`block w-full px-3 py-2 text-left ${i === slashPick ? "bg-emerald-50" : "hover:bg-stone-50"}`}
+                >
+                  <span className="text-sm font-semibold text-emerald-700">/{r.shortcut}</span>
+                  <span className="block truncate text-sm text-stone-600">{r.body}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {slash && !slashMatches.length && (
+          <p className="mb-2 rounded-2xl bg-white px-3 py-2 text-sm text-stone-500 shadow-sm">
+            {replies.length ? "Ninguna respuesta rápida con ese atajo." : "Todavía no hay respuestas rápidas."}{" "}
+            <button type="button" onClick={() => setPicker("rapidas")} className="font-medium text-emerald-700 underline">
+              Crear una
+            </button>
+          </p>
+        )}
+        {picker && (
+          <WaPicker
+            line={line}
+            tab={picker}
+            onTab={setPicker}
+            onEmoji={insertEmoji}
+            onSticker={sendSticker}
+            replies={replies}
+            onReply={useReply}
+            onRepliesChanged={loadReplies}
+            photoUrl={photoUrl}
+          />
+        )}
         <div className="flex items-end gap-2">
           <input
             ref={fileInput}
@@ -732,17 +822,43 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
           <div className="flex min-h-11 flex-1 items-end rounded-3xl bg-white px-1.5 shadow-sm ring-1 ring-stone-200 focus-within:ring-2 focus-within:ring-emerald-400">
             <button
               type="button"
+              onClick={() => setPicker((p) => (p ? null : "emojis"))}
+              aria-expanded={!!picker}
+              className={`my-1 ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-stone-100 ${picker ? "text-emerald-700" : "text-stone-500"}`}
+              aria-label="Emojis, stickers y respuestas rápidas"
+              title="Emojis, stickers y respuestas rápidas"
+            >
+              <SmileIcon />
+            </button>
+            <button
+              type="button"
               onClick={() => fileInput.current?.click()}
-              className="m-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-stone-500 hover:bg-stone-100 hover:text-emerald-700"
+              className="my-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-stone-500 hover:bg-stone-100 hover:text-emerald-700"
               aria-label="Mandar fotos"
               title="Mandar fotos (hasta 30)"
             >
               <PhotoIcon />
             </button>
             <textarea
+              ref={textArea}
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                setSlashPick(0);
+              }}
               onKeyDown={(e) => {
+                if (slashMatches.length) {
+                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    e.preventDefault();
+                    const d = e.key === "ArrowDown" ? 1 : -1;
+                    return setSlashPick((i) => (i + d + slashMatches.length) % slashMatches.length);
+                  }
+                  if (e.key === "Enter" || e.key === "Tab") {
+                    e.preventDefault();
+                    return useReply(slashMatches[Math.min(slashPick, slashMatches.length - 1)]);
+                  }
+                }
+                if (e.key === "Escape" && picker) return setPicker(null);
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   send();
@@ -756,7 +872,7 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
                 }
               }}
               rows={1}
-              placeholder={photos.length ? "Texto para la primera foto (opcional)" : "Escribí un mensaje"}
+              placeholder={photos.length ? "Texto para la primera foto (opcional)" : "Escribí un mensaje o / para respuestas rápidas"}
               className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-1 py-2.5 text-[15px] outline-none placeholder:text-stone-500"
               aria-label="Mensaje"
             />
@@ -774,5 +890,53 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
       </form>
       {error && <p className="px-3 pb-2 text-xs font-medium text-rose-700">{error}</p>}
     </>
+  );
+}
+
+/** Lo que trae un mensaje: foto, sticker, audio, video o documento. */
+function MediaView({ m, onLoad }: { m: WaMessage; onLoad: () => void }) {
+  const url = photoUrl(m.media_path!);
+  if (m.kind === "audio")
+    return (
+      <div className="flex min-w-60 items-center gap-2 px-1.5 pt-1.5 pb-5">
+        <span aria-hidden className="text-xl">
+          🎤
+        </span>
+        <audio controls preload="none" src={url} className="h-9 w-full min-w-48" />
+      </div>
+    );
+  if (m.kind === "video")
+    return <video controls preload="metadata" src={url} className="max-h-80 min-w-48 rounded-xl bg-stone-900" onLoadedMetadata={onLoad} />;
+  if (m.kind === "documento")
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="mb-4 flex min-w-56 items-center gap-3 rounded-xl bg-stone-100/70 px-3 py-2.5 hover:bg-stone-100"
+        download={m.media_path!.endsWith(".bin") ? (m.body ?? "documento").replace(/^📄\s?/u, "") : undefined}
+      >
+        <span className="text-2xl" aria-hidden>
+          📄
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{(m.body ?? "Documento").replace(/^📄\s?/u, "")}</span>
+          <span className="text-xs text-emerald-700">Abrir / descargar</span>
+        </span>
+      </a>
+    );
+  const sticker = m.kind === "sticker";
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="block">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={sticker ? "Sticker" : "Foto"}
+        loading="lazy"
+        className={sticker ? "h-32 w-32 object-contain" : "max-h-80 min-h-24 min-w-40 rounded-xl bg-stone-200 object-cover"}
+        // Al cargar la foto el chat crece: seguir abajo si estaba abajo.
+        onLoad={onLoad}
+      />
+    </a>
   );
 }

@@ -677,3 +677,27 @@ El usuario quiere ver todos esos contactos en el tablero.
   - barra de escribir redonda, con ícono de foto y botón verde de enviar;
   - menú de etiquetas más lindo y una pantalla vacía con 💬.
 - **Modo oscuro:** sale solo por la inversión de la paleta. Lo que va sobre fondo negro fijo usa `text-[#fff]`.
+
+## 26. PR siguiente (7/10): respuestas rápidas, emojis, stickers, audios/videos/documentos y modo oscuro por defecto
+
+- **Pedido:** "todas las funciones de wsp: respuestas rápidas con atajo de /, emojis, gif, sticker etc" y "ponelo modo oscuro".
+- **Migración `0012_whatsapp_rapidas_stickers.sql`** (ya aplicada en producción):
+  - `wa_quick_replies` (`shortcut` único en minúscula, `body`), la misma para los 3 teléfonos; el equipo puede leer, crear, editar y borrar;
+  - `wa_outbox.media_kind` ('foto' | 'sticker') y `media_path` ahora puede ser `in/` u `out/` (los stickers se reenvían desde los que llegaron);
+  - el bucket `wa-media` pasa a 16 MB y acepta audio, video, PDF y octet-stream.
+- **Conector:**
+  - `mediaOf()` (en mensajes.mjs, con tests) y `saveMedia()` bajan foto, sticker, audio, video y documento de los mensajes en vivo y los guardan en `in/<línea>/<id>.<ext>`; los documentos raros van como `.bin`;
+  - la cola manda stickers con `sendMessage({sticker})`;
+  - hay que actualizar el celu (pegar la línea de Termux).
+- **CRM:**
+  - `WaPicker.tsx` (botón 😊 en la barra de escribir) con tres pestañas:
+    - Emojis: `src/lib/emojis.ts`, con recientes en localStorage;
+    - Stickers: los últimos 60 que llegaron (`getWaStickers` / `queueWaSticker`);
+    - Respuestas rápidas: crear, editar y borrar.
+  - Escribir `/` y el atajo muestra sugerencias: ↑↓ para elegir, Enter o Tab pone el texto (no lo manda).
+  - `MediaView` muestra stickers sin globito, `<audio>`, `<video>` y una tarjeta para documentos. `/api/wa-media` acepta las extensiones nuevas.
+- **Modo oscuro por defecto:** `src/lib/theme.ts` usa la clave nueva `crm_tema`; todos arrancan en oscuro y ☀️ lo pasa a claro.
+- **Qué no se hizo:**
+  - las respuestas rápidas guardadas en el celu no se pueden leer: Baileys no emite el evento `quickReplyAction`;
+  - GIFs: hace falta una API key de Giphy o Tenor;
+  - mandar audios o videos desde el CRM.
