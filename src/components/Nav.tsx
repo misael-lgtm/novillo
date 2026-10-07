@@ -46,8 +46,17 @@ export function Nav({ name, isAdmin, shared }: { name: string; isAdmin: boolean;
             >
               📱 Teléfonos
             </Link>
+            <Link
+              href="/carritos"
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${active("/carritos") ? "bg-stone-900 text-white" : "hover:bg-stone-100"}`}
+            >
+              🛒 Carritos
+            </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <Link href="/carritos" className="text-lg md:hidden" aria-label="Carritos abandonados" title="Carritos abandonados">
+              🛒
+            </Link>
             <Link href="/telefonos/carritos" className="text-lg md:hidden" aria-label="Teléfonos" title="Teléfonos">
               📱
             </Link>

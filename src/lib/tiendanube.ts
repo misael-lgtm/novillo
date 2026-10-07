@@ -1,5 +1,7 @@
-// Ventas de la tienda online (Tiendanube) para los objetivos del mes.
+// Ventas de la tienda online (Tiendanube) para los objetivos del mes, y los carritos abandonados.
 // El token vive solo en las variables de entorno del servidor (Vercel), nunca en el navegador ni en la base.
+
+import { normalizePhoneAR } from "./rules";
 
 // TIENDANUBE_API_URL solo para pruebas locales (un Tiendanube de mentira).
 const API = process.env.TIENDANUBE_API_URL?.trim() || "https://api.tiendanube.com/v1";
@@ -253,4 +255,82 @@ export async function exchangeCode(code: string): Promise<{ ok: true; token: str
   } catch {
     return { ok: false, error: "No se pudo conectar con Tiendanube." };
   }
+}
+
+// ── Carritos abandonados ──────────────────────────────────────
+
+/** Carrito que quedó sin pagar en la tienda (Tiendanube los guarda unos 30 días). */
+export type TnCart = {
+  id: number;
+  name: string | null;
+  /** Celular normalizado (549…), si dejó uno que se entienda. */
+  phone: string | null;
+  email: string | null;
+  total: number;
+  products: { name: string; variant: string | null; qty: number }[];
+  /** Link para que la persona retome la compra. */
+  url: string | null;
+  createdAt: string;
+};
+
+type TnCheckout = {
+  id: number;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  billing_name?: string | null;
+  shipping_name?: string | null;
+  total?: string | number | null;
+  abandoned_checkout_url?: string | null;
+  created_at?: string | null;
+  products?: { name?: string | Record<string, string>; variant_values?: string[] | null; quantity?: number | string }[];
+};
+
+const textOf = (x: unknown) => (typeof x === "string" ? x : x && typeof x === "object" ? (Object.values(x as Record<string, string>)[0] ?? "") : "");
+
+/** Los carritos abandonados de los últimos días, del más nuevo al más viejo. null si la tienda no está conectada. */
+export async function abandonedCarts(days = 30): Promise<{ ok: true; carts: TnCart[] } | { ok: false; error: string } | null> {
+  if (!isConnected()) return null;
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const carts: TnCart[] = [];
+  try {
+    for (let page = 1; page <= 20; page++) {
+      const url = new URL(`${API}/${tiendanube.storeId}/checkouts`);
+      url.search = new URLSearchParams({ created_at_min: since, per_page: "200", page: String(page) }).toString();
+      const res = await fetch(url, {
+        headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA },
+        next: { revalidate: Number(process.env.TIENDANUBE_REVALIDATE_SECONDS) || 120 },
+      });
+      if (res.status === 404) break;
+      if (res.status === 401 || res.status === 403) return { ok: false, error: "Tiendanube no dio permiso para ver los carritos abandonados" };
+      if (!res.ok) return { ok: false, error: `Tiendanube respondió ${res.status}` };
+      const list = (await res.json()) as TnCheckout[];
+      for (const c of list) {
+        carts.push({
+          id: c.id,
+          name: (c.contact_name || c.billing_name || c.shipping_name || "").trim() || null,
+          phone: normalizePhoneAR(c.contact_phone ?? null),
+          email: c.contact_email?.trim().toLowerCase() || null,
+          total: Number(c.total) || 0,
+          products: (c.products ?? []).map((p) => ({
+            name: textOf(p.name).trim() || "Producto",
+            variant: p.variant_values?.filter(Boolean).join(" / ") || null,
+            qty: Number(p.quantity) || 1,
+          })),
+          url: c.abandoned_checkout_url || null,
+          createdAt: c.created_at || "",
+        });
+      }
+      if (list.length < 200) break;
+    }
+  } catch {
+    return { ok: false, error: "No se pudo conectar con Tiendanube" };
+  }
+  carts.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return { ok: true, carts };
+}
+
+/** "Buzo Alaska (M) x2, Remera Lino (L)" */
+export function cartSummary(c: TnCart): string {
+  return c.products.map((p) => `${p.name}${p.variant ? ` (${p.variant})` : ""}${p.qty > 1 ? ` x${p.qty}` : ""}`).join(", ");
 }

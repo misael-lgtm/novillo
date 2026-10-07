@@ -765,3 +765,17 @@ El usuario quiere ver todos esos contactos en el tablero.
   - `markStatus()` se llama con los eventos `messages.update` (los avisos de llegó y visto), con lo que entra por `messages.upsert` y el historial, y con 2 apenas sale un mensaje de la cola.
   - Hay que actualizar el celu para que llegue.
 - **CRM:** `Ticks` muestra ✓ gris si está enviado, ✓✓ gris si se entregó o no hay dato (mensajes viejos) y ✓✓ `text-sky-500` si lo vieron. Además el botón "Traer mensajes anteriores" pasó arriba de todo y se agrandó el hueco de la hora.
+
+## 33. PR siguiente (7/10): carritos abandonados de Tiendanube
+
+- **Pedido:** traer al CRM los carritos abandonados que muestra la tienda.
+- **Página `/carritos`** (en el menú "🛒 Carritos"; en el celu es el 🛒 de arriba):
+  - `abandonedCarts()` en `src/lib/tiendanube.ts` lee `GET /checkouts` de los últimos 30 días, con caché de 2 min;
+  - filtro de 3, 7 o 30 días y buscador;
+  - cada tarjeta muestra nombre, celular (normalizado), mail, productos con talle y cantidad, monto y hace cuánto;
+  - marca si la persona ya está en el CRM, si tiene una tarjeta abierta y si tiene chat en el Teléfono Carritos.
+- **Acciones:**
+  - "💬 Escribirle": abre `/telefonos/carritos?numero=…&texto=…` con el mensaje armado (nombre, productos y link), así que `WaInbox` acepta `initialText`;
+  - "🔗 Link": copia `abandoned_checkout_url`;
+  - "➕ Al tablero": `createCartOrder(cartId)` vuelve a buscar el carrito en el servidor, crea o encuentra al cliente y crea la tarjeta en Interesado, con canal tienda online, el total y la descripción con lo que dejó.
+- **Ojo:** si la app de Tiendanube no tiene permiso para los checkouts, la página lo avisa (401/403).

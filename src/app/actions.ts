@@ -26,7 +26,7 @@ import {
 } from "@/lib/rules";
 import { TEAM_SCOPE } from "@/lib/goals";
 import { FINAL_PAGE, ORDER_SELECT } from "@/lib/queries";
-import { fetchCustomersPage } from "@/lib/tiendanube";
+import { abandonedCarts, cartSummary, fetchCustomersPage } from "@/lib/tiendanube";
 import { requireMember } from "@/lib/session";
 import type { ActionResult, Customer, Order, OrderWithCustomer } from "@/lib/types";
 
@@ -802,4 +802,42 @@ export async function setMemberActive(email: string, active: boolean): Promise<A
   if (error) return { ok: false, error: friendly(error) };
   refresh();
   return { ok: true };
+}
+
+/**
+ * Carrito abandonado de Tiendanube → tarjeta en el tablero ("Interesado", canal tienda online),
+ * con el cliente (lo crea si no existe) y lo que dejó en el carrito como descripción.
+ */
+export async function createCartOrder(cartId: number): Promise<ActionResult<{ id: string; number: number }>> {
+  const { supabase, me } = await requireMember();
+  const res = await abandonedCarts();
+  if (!res?.ok) return { ok: false, error: res ? res.error : "La tienda no está conectada." };
+  const cart = res.carts.find((c) => c.id === cartId);
+  if (!cart) return { ok: false, error: "Ese carrito ya no está (quizás lo terminó de pagar)." };
+  if (!cart.phone && !cart.email) return { ok: false, error: "El carrito no tiene celular ni mail para crear el cliente." };
+
+  const customer = await findOrCreateCustomer({
+    name: cart.name ?? cart.email ?? "Cliente de la tienda",
+    instagram: null,
+    phone: cart.phone,
+    email: cart.email,
+  });
+  if (!customer.ok) return customer;
+  const description = `🛒 Carrito abandonado: ${cartSummary(cart) || "sin detalle"}${cart.url ? `\n${cart.url}` : ""}`.slice(0, 2000);
+  const { data, error } = await supabase
+    .from("orders")
+    .insert({
+      customer_id: customer.data!.id,
+      channel: "tienda_online",
+      description,
+      stage: "interesado",
+      total: cart.total || null,
+      assigned_to: me.email,
+    })
+    .select("id, number")
+    .single<{ id: string; number: number }>();
+  if (error || !data) return { ok: false, error: friendly(error) };
+  await createFollowUp(data.id, data.number, "interesado", me.email);
+  refresh();
+  return { ok: true, data, message: `Tarjeta #${data.number} creada en Interesado ✔` };
 }
