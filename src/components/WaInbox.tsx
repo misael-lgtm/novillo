@@ -8,6 +8,7 @@ import {
   getWaMessages,
   sendWaMessage,
   getWaQuickReplies,
+  openWaChatByPhone,
   queueWaPhotos,
   queueWaSticker,
   setWaChatLabel,
@@ -226,7 +227,19 @@ async function shrinkPhoto(file: File): Promise<Blob> {
   return new Promise((ok, fail) => canvas.toBlob((b) => (b ? ok(b) : fail(new Error("sin foto"))), "image/jpeg", 0.82));
 }
 
-export function WaInbox({ line, short, isAdmin, connectorHelp }: { line: string; short: string; isAdmin: boolean; connectorHelp: string }) {
+export function WaInbox({
+  line,
+  short,
+  isAdmin,
+  connectorHelp,
+  initialPhone,
+}: {
+  line: string;
+  short: string;
+  isAdmin: boolean;
+  connectorHelp: string;
+  initialPhone?: string;
+}) {
   const [state, setState] = useState<WaLineState | null>(null);
   const [chats, setChats] = useState<WaChat[]>([]);
   const [labels, setLabels] = useState<WaLabel[]>([]);
@@ -234,6 +247,25 @@ export function WaInbox({ line, short, isAdmin, connectorHelp }: { line: string;
   const [filter, setFilter] = useState("");
   const [openJid, setOpenJid] = useState<string | null>(null);
   const [openChat, setOpenChat] = useState<WaChat | null>(null);
+  const [newChat, setNewChat] = useState(false);
+  const [newPhone, setNewPhone] = useState("");
+  const [newError, setNewError] = useState<string | null>(null);
+
+  async function startChat(raw: string) {
+    setNewError(null);
+    const r = await openWaChatByPhone(line, raw);
+    if (!r.ok || !r.data) return setNewError(r.ok ? "No se pudo abrir." : r.error);
+    setOpenJid(r.data.jid);
+    setOpenChat(r.data);
+    setNewChat(false);
+    setNewPhone("");
+  }
+
+  // Link directo para escribirle a alguien: /telefonos/carritos?numero=1123456789
+  useEffect(() => {
+    if (initialPhone) startChat(initialPhone);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPhone]);
   // El chat abierto, con sus datos al día (etiquetas, nombre) aunque deje de estar en la lista filtrada.
   const open = (openJid && chats.find((c) => c.jid === openJid)) || (openChat?.jid === openJid ? openChat : null);
 
@@ -304,16 +336,58 @@ export function WaInbox({ line, short, isAdmin, connectorHelp }: { line: string;
       <div className="card grid h-[calc(100dvh-22rem)] min-h-[28rem] grid-cols-1 overflow-hidden shadow-sm md:grid-cols-[22rem_1fr]">
         <aside className={`flex min-h-0 flex-col border-stone-200 md:border-r ${open ? "hidden md:flex" : "flex"}`}>
           <div className="space-y-2.5 border-b border-stone-200 p-3">
-            <label className="flex items-center gap-2 rounded-full bg-stone-100 px-3.5 py-2 text-stone-500 focus-within:ring-2 focus-within:ring-emerald-400">
-              <SearchIcon />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar nombre o número…"
-                className="min-w-0 flex-1 bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-500"
-                aria-label="Buscar chat"
-              />
-            </label>
+            <div className="flex items-center gap-2">
+              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-stone-100 px-3.5 py-2 text-stone-500 focus-within:ring-2 focus-within:ring-emerald-400">
+                <SearchIcon />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar nombre o número…"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-500"
+                  aria-label="Buscar chat"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewChat((v) => !v);
+                  setNewError(null);
+                }}
+                aria-expanded={newChat}
+                className={`flex h-9 shrink-0 items-center gap-1 rounded-full px-3 text-sm font-semibold transition ${
+                  newChat ? "bg-stone-200 text-stone-700" : "bg-emerald-600 text-white hover:bg-emerald-700"
+                }`}
+                title="Escribirle a un número nuevo"
+              >
+                {newChat ? "✕" : "+ Nuevo chat"}
+              </button>
+            </div>
+            {newChat && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  startChat(newPhone);
+                }}
+                className="space-y-2 rounded-2xl bg-emerald-50 p-3"
+              >
+                <label className="block text-xs font-semibold text-stone-700">
+                  Número de WhatsApp
+                  <input
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    placeholder="Ej: 11 2345-6789"
+                    inputMode="tel"
+                    autoFocus
+                    className="input mt-1 py-2 font-normal"
+                    aria-label="Número para el chat nuevo"
+                  />
+                </label>
+                {newError && <p className="text-xs font-medium text-rose-700">{newError}</p>}
+                <button type="submit" disabled={!newPhone.trim()} className="btn-primary w-full py-2">
+                  Abrir chat
+                </button>
+              </form>
+            )}
             {labels.length > 0 && (
               <div className="flex gap-1.5 overflow-x-auto pb-0.5" role="group" aria-label="Filtrar por etiqueta">
                 {[{ id: "", name: "Todos", color: null } as WaLabel, ...labels].map((l) => (

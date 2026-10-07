@@ -3,6 +3,7 @@
 // WhatsApp de los locales: el CRM lee lo que guarda el conector (wa-conector/) y deja mensajes en la cola.
 
 import { PHONE_LINES } from "@/lib/config";
+import { normalizePhoneAR } from "@/lib/rules";
 import { requireMember } from "@/lib/session";
 import type { ActionResult } from "@/lib/types";
 
@@ -203,6 +204,32 @@ export async function startWaChat(line: string, phone: string, body: string): Pr
   const jid = `${digits}@s.whatsapp.net`;
   const r = await sendWaMessage(line, jid, body);
   return r.ok ? { ok: true, data: { jid } } : r;
+}
+
+/**
+ * Abrir un chat por número (para escribirle a alguien nuevo): si ya hay chat con ese celular, ese;
+ * si no, uno vacío que se crea con el primer mensaje.
+ */
+export async function openWaChatByPhone(line: string, raw: string): Promise<ActionResult<WaChat>> {
+  if (!validLine(line)) return { ok: false, error: "Teléfono inválido." };
+  const phone = normalizePhoneAR(raw);
+  if (!phone) return { ok: false, error: "Número inválido. Escribilo con característica, ej: 11 2345-6789 o 223 456-7890." };
+  const { supabase } = await requireMember();
+  const [{ data: existing }, { data: customer }] = await Promise.all([
+    supabase
+      .from("wa_chat_list")
+      .select("jid, name, phone, last_message, last_at, unread, labels")
+      .eq("line", line)
+      .eq("phone", phone)
+      .order("last_at", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle<Omit<WaChat, "customer">>(),
+    supabase.from("customers").select("id, name").eq("phone", phone).is("archived_at", null).limit(1).maybeSingle<{ id: string; name: string }>(),
+  ]);
+  const chat: WaChat = existing
+    ? { ...existing, labels: existing.labels ?? [], customer: customer ?? null }
+    : { jid: `${phone}@s.whatsapp.net`, name: null, phone, last_message: null, last_at: null, unread: 0, labels: [], customer: customer ?? null };
+  return { ok: true, data: chat };
 }
 
 /** Desvincular el teléfono (pide un QR nuevo). Solo admin. */

@@ -353,6 +353,14 @@ async function tick() {
       const sock = sockets.get(p.line);
       if (!sock?.user) continue; // ese teléfono todavía no está conectado: queda en la cola
       try {
+        // Chat nuevo (escrito desde "+ Nuevo chat"): fijarse que el número tenga WhatsApp.
+        if (p.jid.endsWith("@s.whatsapp.net")) {
+          const { count } = await db.from("wa_chats").select("jid", { count: "exact", head: true }).eq("line", p.line).eq("jid", p.jid);
+          if (!count) {
+            const [found] = await sock.onWhatsApp(p.jid.split("@")[0]).catch(() => [null]);
+            if (found && !found.exists) throw new Error("Ese número no tiene WhatsApp");
+          }
+        }
         let sent, body, kind;
         if (p.media_path) {
           const { data: file, error } = await db.storage.from(MEDIA_BUCKET).download(p.media_path);
