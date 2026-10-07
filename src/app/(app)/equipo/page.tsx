@@ -4,6 +4,8 @@ import Link from "next/link";
 import { getGoalSummary, monthStart } from "@/lib/goals";
 import { formatMoney } from "@/lib/rules";
 import { AddMemberForm, AvatarInput, GoalsForm, MemberToggle } from "@/components/Team";
+import { CelebrationImageForm } from "@/components/CelebrationImageForm";
+import { getCelebrationImage } from "@/app/goal-actions";
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
   const { supabase, me } = await requireMember();
@@ -11,7 +13,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const team = await getTeam();
   const { mes } = await searchParams;
   const month = mes && /^\d{4}-\d{2}$/.test(mes) ? `${mes}-01` : monthStart();
-  const goals = await getGoalSummary(supabase, team, month);
+  const [goals, celebrationImage] = await Promise.all([getGoalSummary(supabase, team, month), getCelebrationImage()]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -57,6 +59,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         teamGoal={goals.explicitTeamGoal}
         members={goals.members.map((m) => ({ email: m.scope, name: m.name, goal: m.goal, total: m.total }))}
       />
+      <CelebrationImageForm image={celebrationImage} />
       <AddMemberForm sharedLogins={[...new Set(team.map((m) => m.login_email).filter((l): l is string => !!l))]} />
     </div>
   );
