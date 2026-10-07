@@ -1,0 +1,18 @@
+CONECTOR DE WHATSAPP - WAYFARER CRM
+===================================
+
+Mantiene vinculados los WhatsApp de Carritos, Guemes y Palermo y los conecta con el CRM.
+Va en UNA compu que quede prendida (sirve para los 3 telefonos).
+
+1. Instalar Node.js (version LTS) desde https://nodejs.org
+2. Copiar ".env.ejemplo" como ".env" y completar SUPABASE_SERVICE_ROLE_KEY
+   (Supabase -> Project Settings -> API -> service_role). Es secreta: no la compartas.
+3. Doble clic en "iniciar.bat". La primera vez instala lo que necesita.
+   Cuando dice "No cierres esta ventana", esta andando.
+4. En el CRM, en "Telefonos", aparece el QR de cada telefono para vincularlo.
+5. Para que arranque solo: Windows + R -> shell:startup -> pegar ahi un acceso directo a iniciar.bat
+
+Las credenciales de WhatsApp quedan en la carpeta "sesiones" de esta compu.
+Si se borra esa carpeta, hay que volver a escanear los QR.
+
+Instrucciones completas (tambien para Android): en el CRM, Telefonos -> "Instalar el conector".

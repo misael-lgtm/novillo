@@ -1,0 +1,15 @@
+{
+  "name": "wayfarer-wa-conector",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Mantiene vinculados por QR los WhatsApp de los locales y los conecta con el CRM.",
+  "type": "module",
+  "main": "conector.mjs",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node conector.mjs" },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "baileys": "7.0.0-rc14",
+    "pino": "^9.6.0"
+  }
+}

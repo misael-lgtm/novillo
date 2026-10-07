@@ -5,3 +5,8 @@ out/
 .env
 *.tsbuildinfo
 next-env.d.ts
+
+# Conector de WhatsApp: sesiones y claves quedan solo en la compu del local
+wa-conector/sesiones/
+wa-conector/.env
+wa-conector.zip
