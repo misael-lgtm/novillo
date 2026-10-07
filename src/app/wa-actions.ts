@@ -5,13 +5,11 @@
 import { PHONE_LINES } from "@/lib/config";
 import { requireMember } from "@/lib/session";
 import type { ActionResult } from "@/lib/types";
-import { randomUUID } from "node:crypto";
 
 const LINE_IDS = PHONE_LINES.map((l) => l.id) as string[];
 const validLine = (line: string) => LINE_IDS.includes(line);
 const validJid = (jid: string) => /^\d+@(s\.whatsapp\.net|lid)$/.test(jid);
-const MEDIA_BUCKET = "wa-media";
-const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+const MAX_PHOTOS = 30;
 
 export type WaLineState = {
   status: "desconectado" | "esperando_qr" | "conectando" | "conectado";
@@ -154,33 +152,30 @@ export async function sendWaMessage(line: string, jid: string, body: string): Pr
   return { ok: true };
 }
 
-/** Mandar una foto (con texto opcional): se sube al almacenamiento y queda en la cola para el conector. */
-export async function sendWaPhoto(form: FormData): Promise<ActionResult> {
-  const line = String(form.get("line") ?? "");
-  const jid = String(form.get("jid") ?? "");
-  const caption = String(form.get("caption") ?? "")
-    .trim()
-    .slice(0, 1000);
-  const file = form.get("file");
+/**
+ * Mandar fotos (hasta 30): el navegador ya las subió al almacenamiento (out/<teléfono>/<uuid>.jpg);
+ * acá quedan en la cola, en orden, con el texto en la primera.
+ */
+export async function queueWaPhotos(line: string, jid: string, caption: string, paths: string[]): Promise<ActionResult> {
   if (!validLine(line)) return { ok: false, error: "Teléfono inválido." };
   if (!validJid(jid)) return { ok: false, error: "Chat inválido." };
-  if (!(file instanceof File) || !file.size) return { ok: false, error: "Elegí una foto." };
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return { ok: false, error: "Tiene que ser una foto (JPG o PNG)." };
-  if (file.size > MAX_PHOTO_BYTES) return { ok: false, error: "La foto es muy pesada." };
+  if (!paths.length || paths.length > MAX_PHOTOS) return { ok: false, error: `Entre 1 y ${MAX_PHOTOS} fotos.` };
+  const valid = new RegExp(`^out/${line}/[0-9a-f-]{36}\\.jpg$`);
+  if (!paths.every((p) => valid.test(p))) return { ok: false, error: "Foto inválida." };
   const { supabase, me } = await requireMember();
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const path = `out/${line}/${randomUUID()}.${ext}`;
-  const up = await supabase.storage.from(MEDIA_BUCKET).upload(path, await file.arrayBuffer(), { contentType: file.type });
-  if (up.error) return { ok: false, error: "No se pudo subir la foto. Probá de nuevo." };
-  const { error } = await supabase.from("wa_outbox").insert({
+  const now = Date.now();
+  const rows = paths.map((media_path, i) => ({
     line,
     jid,
-    body: caption,
-    media_path: path,
-    media_type: file.type,
+    body: i === 0 ? caption.trim().slice(0, 1000) : "",
+    media_path,
+    media_type: "image/jpeg",
     created_by: me.email,
-  });
-  if (error) return { ok: false, error: "No se pudo mandar. Probá de nuevo." };
+    // Un milisegundo de diferencia para que el conector las mande en este orden.
+    created_at: new Date(now + i).toISOString(),
+  }));
+  const { error } = await supabase.from("wa_outbox").insert(rows);
+  if (error) return { ok: false, error: "No se pudieron mandar. Probá de nuevo." };
   return { ok: true };
 }
 

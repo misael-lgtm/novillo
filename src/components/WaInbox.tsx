@@ -7,7 +7,7 @@ import {
   getWaLine,
   getWaMessages,
   sendWaMessage,
-  sendWaPhoto,
+  queueWaPhotos,
   setWaChatLabel,
   unlinkWaLine,
   type WaChat,
@@ -16,6 +16,7 @@ import {
   type WaMessage,
 } from "@/app/wa-actions";
 import { formatPhone } from "@/lib/rules";
+import { createClient } from "@/lib/supabase/client";
 
 const POLL_MS = 3000;
 
@@ -312,24 +313,36 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
     setSending(true);
     setError(null);
     if (photos.length) {
-      // De a una, en orden. El texto va con la primera. Si una falla, quedan las que faltan para reintentar.
-      for (let i = 0; i < photos.length; i++) {
-        setProgress(photos.length > 1 ? `Subiendo ${i + 1} de ${photos.length}…` : null);
-        const form = new FormData();
-        form.set("line", line);
-        form.set("jid", chat.jid);
-        form.set("caption", i === 0 ? body : "");
-        form.set("file", new File([photos[i].blob], "foto.jpg", { type: "image/jpeg" }));
-        const r = await sendWaPhoto(form);
-        if (!r.ok) {
-          photos.slice(0, i).forEach((p) => URL.revokeObjectURL(p.url));
-          setPhotos(photos.slice(i));
-          if (i > 0) setText("");
-          setSending(false);
-          setProgress(null);
-          load();
-          return setError(`${r.error}${i > 0 ? ` (salieron ${i}; quedan ${photos.length - i})` : ""}`);
+      // Directo del navegador al almacenamiento, de a 4 a la vez (no pasan por el servidor del CRM).
+      const storage = createClient().storage.from("wa-media");
+      const paths = photos.map(() => `out/${line}/${crypto.randomUUID()}.jpg`);
+      let done = 0;
+      let next = 0;
+      let failed = false;
+      const upload = async (i: number) => {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const { error } = await storage.upload(paths[i], photos[i].blob, { contentType: "image/jpeg" });
+          if (!error) return true;
         }
+        return false;
+      };
+      setProgress(`Subiendo 0 de ${photos.length}…`);
+      await Promise.all(
+        Array.from({ length: Math.min(4, photos.length) }, async () => {
+          while (!failed && next < photos.length) {
+            const i = next++;
+            if (!(await upload(i))) failed = true;
+            else setProgress(`Subiendo ${++done} de ${photos.length}…`);
+          }
+        }),
+      );
+      const r = failed
+        ? { ok: false as const, error: "No se pudieron subir las fotos. Revisá internet y probá de nuevo." }
+        : await queueWaPhotos(line, chat.jid, body, paths);
+      if (!r.ok) {
+        setSending(false);
+        setProgress(null);
+        return setError(r.error);
       }
       photos.forEach((p) => URL.revokeObjectURL(p.url));
       setPhotos([]);
