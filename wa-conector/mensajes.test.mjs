@@ -1,7 +1,7 @@
 // node --test wa-conector/mensajes.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatJid, contentOf, dateOf, imageOf, mediaOf, nameOf, phoneOf, statusOf, toRow } from "./mensajes.mjs";
+import { adOf, chatJid, contentOf, dateOf, imageOf, mediaOf, nameOf, phoneOf, statusOf, toRow } from "./mensajes.mjs";
 
 test("chat: número normal, con el :dispositivo sacado", () => {
   assert.equal(chatJid({ remoteJid: "5491123456789:3@s.whatsapp.net" }), "5491123456789@s.whatsapp.net");
@@ -100,4 +100,25 @@ test("estado del mensaje: enviado, entregado, visto; lo demás no", () => {
   assert.equal(statusOf(1), null);
   assert.equal(statusOf(0), null);
   assert.equal(statusOf(undefined), null);
+});
+
+test("anuncios: mensaje que viene de un anuncio de Meta; un link de wa.me o un texto normal no", () => {
+  const fromAd = {
+    extendedTextMessage: {
+      text: "Hola! Quiero más info",
+      contextInfo: { externalAdReply: { title: "Campera Alaska 2x1", sourceType: "ad", sourceId: "120210", sourceUrl: "https://fb.me/abc", ctwaClid: "x" } },
+    },
+  };
+  assert.deepEqual(adOf(fromAd), { id: "120210", title: "Campera Alaska 2x1", url: "https://fb.me/abc" });
+  assert.deepEqual(adOf({ conversation: "hola" }), null);
+  assert.equal(adOf({ extendedTextMessage: { text: "hola", contextInfo: { entryPointConversionSource: "click_to_chat_link" } } }), null);
+  assert.equal(adOf({ extendedTextMessage: { text: "hola", contextInfo: { entryPointConversionSource: "broadcast" } } }), null);
+  assert.equal(adOf({ extendedTextMessage: { text: "hola", contextInfo: { conversionSource: "FB_Ads" } } })?.id, "anuncio");
+  const row = toRow("carritos", {
+    key: { remoteJid: "5491123456789@s.whatsapp.net", id: "AD1", fromMe: false },
+    message: fromAd,
+    messageTimestamp: 1790000000,
+  });
+  assert.equal(row.ad_id, "120210");
+  assert.equal(row.ad_title, "Campera Alaska 2x1");
 });
