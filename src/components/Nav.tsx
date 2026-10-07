@@ -40,6 +40,12 @@ export function Nav({ name, isAdmin, shared }: { name: string; isAdmin: boolean;
                 </Link>
               ),
             )}
+            <Link
+              href="/telefonos/carritos"
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${active("/telefonos") ? "bg-stone-900 text-white" : "hover:bg-stone-100"}`}
+            >
+              📱 Teléfonos
+            </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <ThemeToggle />

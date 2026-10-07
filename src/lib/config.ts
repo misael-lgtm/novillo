@@ -152,6 +152,14 @@ export const PAYMENT_METHOD_IDS = PAYMENT_METHODS.map((p) => p.id) as [
   ...PaymentMethodId[],
 ];
 
+/** Los 3 teléfonos de WhatsApp Business de los locales (pestañas de "Teléfonos"). */
+export const PHONE_LINES = [
+  { id: "carritos", label: "Teléfono Carritos", short: "Carritos" },
+  { id: "guemes", label: "Teléfono Güemes", short: "Güemes" },
+  { id: "palermo", label: "Teléfono Palermo", short: "Palermo" },
+] as const;
+export type PhoneLineId = (typeof PHONE_LINES)[number]["id"];
+
 /** Promo bancaria con la que pagó (opcional, se elige al pasar a Compró). */
 export const BANK_PROMOS = [
   { id: "bna", label: "Promo BNA" },
