@@ -73,5 +73,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // /conector/ es público: el instalador del conector de WhatsApp (sin claves) se baja desde el celu sin iniciar sesión.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|conector/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
