@@ -725,3 +725,11 @@ El usuario quiere ver todos esos contactos en el tablero.
   - `openWaChatByPhone`: si ya hay un chat con ese celular (aunque esté guardado como @lid), abre ese; si no, abre uno vacío con `549…@s.whatsapp.net`, que se crea con el primer mensaje;
   - también hay link directo: `/telefonos/<línea>?numero=1123456789`.
 - **Conector:** antes de mandar a un número sin chat, revisa con `onWhatsApp` que tenga WhatsApp. Si no tiene, el mensaje queda con el error "Ese número no tiene WhatsApp". Está en el zip; hace falta actualizar el celu para tenerlo, pero lo demás anda igual sin actualizar.
+
+## 29. PR siguiente (7/10): velocidad
+
+- **Pedido:** "está bastante lento en general el CRM".
+- **Causa 1, región:** la base está en Supabase `sa-east-1` (San Pablo) y las funciones de Vercel corrían en `iad1` (EE. UU.), así que cada consulta cruzaba el continente. Ahora `vercel.json` tiene `regions: ["gru1"]` (San Pablo).
+- **Causa 2, permisos fila por fila:** las políticas RLS llamaban `is_team_member()` / `is_admin()` / `current_member()` una vez por fila. La migración `0014_rls_rapido.sql` (ya aplicada) las reescribe todas como `(select public.fn())`, así se calculan una sola vez por consulta. Las reglas son las mismas. La consulta del tablero (9585 pedidos con su cliente) bajó de 408 a 216 ms en la base. Se agregaron los 3 índices de FK que marcaban los avisos.
+- **Si sigue lento:** el tablero trae todos los pedidos de una (el usuario pidió ver todas las tarjetas de Compró y Sin causa). La próxima mejora sería cargar esas columnas de a partes.
+- **Ojo con las pruebas:** `schema_test` pasa. Los scripts Playwright viejos (`e2e.mjs`, `board.mjs`, …) fallan también sin este cambio, porque dependen de datos sembrados que ya no están o de textos que cambiaron.
