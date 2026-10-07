@@ -13,7 +13,15 @@
 import { readFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import makeWASocket, { ALL_WA_PATCH_NAMES, Browsers, DisconnectReason, downloadMediaMessage, fetchLatestBaileysVersion, useMultiFileAuthState } from "baileys";
+import makeWASocket, {
+  ALL_WA_PATCH_NAMES,
+  Browsers,
+  DisconnectReason,
+  downloadMediaMessage,
+  fetchLatestBaileysVersion,
+  proto,
+  useMultiFileAuthState,
+} from "baileys";
 import { createClient } from "@supabase/supabase-js";
 import pino from "pino";
 import { chatJid, mediaOf, nameOf, normalizeJid, phoneOf, toRow } from "./mensajes.mjs";
@@ -105,8 +113,9 @@ async function saveMedia(line, m) {
   }
 }
 
-async function saveMessages(line, msgs, { history = false } = {}) {
-  const since = Date.now() - HISTORY_DAYS * 86400000;
+async function saveMessages(line, msgs, { history = false, onDemand = false } = {}) {
+  // Lo que se pidió con "Traer mensajes anteriores" se guarda entero; del historial inicial, solo los últimos días.
+  const since = onDemand ? 0 : Date.now() - HISTORY_DAYS * 86400000;
   const rows = [];
   const names = new Map();
   for (const m of msgs) {
@@ -317,9 +326,11 @@ async function startLine(line) {
   });
 
   sock.ev.on("messages.upsert", ({ messages }) => saveMessages(line, messages).catch((e) => log(line, e.message)));
-  sock.ev.on("messaging-history.set", async ({ messages, contacts, chats }) => {
+  sock.ev.on("messaging-history.set", async ({ messages, contacts, chats, syncType }) => {
     try {
-      await saveMessages(line, messages, { history: true });
+      const onDemand = syncType === proto.HistorySync.HistorySyncType.ON_DEMAND;
+      if (onDemand) log(line, `llegaron ${messages.length} mensajes anteriores`);
+      await saveMessages(line, messages, { history: true, onDemand });
       await saveContacts(line, [...(contacts ?? []), ...(chats ?? [])]);
     } catch (e) {
       log(line, e.message);
@@ -444,6 +455,52 @@ async function tick() {
           .from("wa_label_ops")
           .update({ error: String(e.message).slice(0, 300) })
           .eq("id", o.id);
+      }
+    }
+
+    // "Traer mensajes anteriores": pedirle al celu los mensajes de antes del más viejo que tenemos.
+    const { data: asks } = await db
+      .from("wa_history_requests")
+      .select("id, line, jid")
+      .is("done_at", null)
+      .is("error", null)
+      .in("line", LINES)
+      .order("created_at")
+      .limit(5);
+    for (const a of asks ?? []) {
+      const sock = sockets.get(a.line);
+      if (!sock?.user) continue;
+      try {
+        // Todos los identificadores de esa persona (número y @lid).
+        const { data: chat } = await db.from("wa_chats").select("phone").eq("line", a.line).eq("jid", a.jid).maybeSingle();
+        const { data: same } = chat?.phone ? await db.from("wa_chats").select("jid").eq("line", a.line).eq("phone", chat.phone) : { data: [] };
+        const jids = [...new Set([a.jid, ...(same ?? []).map((c) => c.jid)])];
+        const { data: oldest } = await db
+          .from("wa_messages")
+          .select("id, jid, from_me, at")
+          .eq("line", a.line)
+          .in("jid", jids)
+          .order("at")
+          .limit(1)
+          .maybeSingle();
+        if (!oldest) throw new Error("ese chat no tiene mensajes guardados");
+        // WhatsApp puede tener el chat por número o por @lid: se pide por los dos (el que no corresponde se ignora).
+        const lidMap = sock.signalRepository?.lidMapping;
+        const targets = new Set(jids);
+        for (const j of jids) {
+          const other = j.endsWith("@lid") ? await lidMap?.getPNForLID(j).catch(() => null) : await lidMap?.getLIDForPN(j).catch(() => null);
+          if (other) targets.add(normalizeJid(other));
+        }
+        for (const remoteJid of targets) {
+          await sock.fetchMessageHistory(50, { remoteJid, id: oldest.id, fromMe: oldest.from_me }, Date.parse(oldest.at));
+        }
+        await db.from("wa_history_requests").update({ done_at: new Date().toISOString() }).eq("id", a.id);
+      } catch (e) {
+        log(a.line, "no se pudieron pedir mensajes anteriores:", e.message);
+        await db
+          .from("wa_history_requests")
+          .update({ error: String(e.message).slice(0, 300) })
+          .eq("id", a.id);
       }
     }
 

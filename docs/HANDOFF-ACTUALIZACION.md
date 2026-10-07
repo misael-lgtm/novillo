@@ -742,3 +742,16 @@ El usuario quiere ver todos esos contactos en el tablero.
   - `usePoll` no larga otra consulta si la anterior no volvió;
   - mientras carga, la conversación muestra "Cargando mensajes…" (antes decía "Sin mensajes todavía").
   - Las escrituras (mandar, etiquetar) siguen siendo server actions.
+
+## 31. PR siguiente (7/10): conversación completa
+
+- **Pedido:** "no estoy viendo la conversación completa".
+- **Causas:**
+  - el historial inicial solo trae lo reciente: en producción Güemes tiene desde el 26/9 y Carritos desde el 7/9, y el conector además guardaba solo 30 días;
+  - algunas personas quedaron con dos chats (el número y un @lid): 4 en Carritos y 3 en Güemes;
+  - solo se mostraban los últimos 200 mensajes.
+- **Arreglo:**
+  - **Una conversación por celular:** `sameChatJids` junta los chats con el mismo `phone` en esa línea, tanto en la lista (`getWaLine` deja uno solo y suma no leídos y etiquetas) como en los mensajes (`getWaMessages`, ahora hasta 500).
+  - **"⬆️ Traer mensajes anteriores":** botón arriba de la conversación, que se dispara solo si el chat tiene menos de 30 mensajes (una vez por chat y por pestaña). Crea una fila en `wa_history_requests` (migración `0015`, ya aplicada).
+  - **Conector:** toma el mensaje más viejo guardado y llama `sock.fetchMessageHistory(50, key, ts)` por el número y por el @lid. Lo que vuelve llega por `messaging-history.set` con `syncType ON_DEMAND` y se guarda sin el límite de días. Hay que actualizar el celu para tenerlo.
+- **No probado contra WhatsApp real:** si el celu responde al pedido ON_DEMAND con el jid que se manda.

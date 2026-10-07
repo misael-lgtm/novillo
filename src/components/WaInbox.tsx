@@ -9,6 +9,7 @@ import {
   openWaChatByPhone,
   queueWaPhotos,
   queueWaSticker,
+  requestWaHistory,
   setWaChatLabel,
   unlinkWaLine,
   type WaChat,
@@ -564,11 +565,29 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
   const atBottom = useRef(true);
 
   const [loaded, setLoaded] = useState(false);
+  const [askedHistory, setAskedHistory] = useState(false);
+
+  /** Pedirle al celu los mensajes anteriores (los trae el conector en unos segundos). */
+  const askHistory = useCallback(async () => {
+    setAskedHistory(true);
+    try {
+      sessionStorage.setItem(`wa-historial:${line}:${chat.jid}`, "1");
+    } catch {}
+    await requestWaHistory(line, chat.jid);
+  }, [line, chat.jid]);
   const load = useCallback(async () => {
     setMsgs(await getJson<WaMessage[]>(`/api/wa/mensajes?${new URLSearchParams({ line, jid: chat.jid })}`));
     setLoaded(true);
   }, [line, chat.jid]);
   usePoll(load, [load]);
+  // Si el chat tiene pocos mensajes, pedir los anteriores solo (una vez por chat en esta pestaña).
+  useEffect(() => {
+    if (!loaded || msgs.length >= 30 || askedHistory) return;
+    try {
+      if (sessionStorage.getItem(`wa-historial:${line}:${chat.jid}`)) return;
+    } catch {}
+    askHistory();
+  }, [loaded, msgs.length, askedHistory, askHistory, line, chat.jid]);
   useEffect(() => {
     if (msgs.length !== lastCount.current) bottom.current?.scrollIntoView({ block: "end" });
     lastCount.current = msgs.length;
@@ -805,6 +824,18 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
             </div>
           );
         })}
+        {loaded && (
+          <div className="mb-3 flex justify-center">
+            <button
+              type="button"
+              onClick={askHistory}
+              disabled={askedHistory}
+              className="rounded-full bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm hover:bg-white disabled:text-stone-500"
+            >
+              {askedHistory ? "⏳ Pidiendo mensajes anteriores al celu…" : "⬆️ Traer mensajes anteriores"}
+            </button>
+          </div>
+        )}
         {!loaded && !msgs.length && (
           <p className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full bg-white/90 px-4 py-1.5 text-sm text-stone-500 shadow-sm">
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" aria-hidden />
