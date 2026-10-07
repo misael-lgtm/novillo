@@ -5,7 +5,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getCelebrationImage, getOffSalesFeed, type OffSale } from "@/app/goal-actions";
+import { getCelebrationImage, type OffSale } from "@/app/goal-actions";
 import { formatMoney } from "@/lib/rules";
 
 const POLL_MS = 60_000;
@@ -38,7 +38,10 @@ export function SaleCelebration() {
   const seenMem = useRef<Seen | null>(null);
 
   const check = useCallback(async () => {
-    const feed = await getOffSalesFeed().catch(() => null);
+    // Por una ruta GET y no server action: Tiendanube puede tardar y no tiene que frenar al resto del CRM.
+    const feed: { month: string; sales: OffSale[] } | null = await fetch("/api/ventas-off", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
     if (!feed) return;
     const seen = readSeen() ?? seenMem.current;
     const ids = feed.sales.map((s) => s.id);

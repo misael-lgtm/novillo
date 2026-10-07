@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
-  getWaLine,
-  getWaMessages,
   sendWaMessage,
   getWaQuickReplies,
   openWaChatByPhone,
@@ -25,14 +23,32 @@ import { createClient } from "@/lib/supabase/client";
 
 const POLL_MS = 3000;
 
-/** Cada pocos segundos, mientras la pestaña está a la vista. */
-function usePoll(fn: () => void, deps: unknown[]) {
+/** Cada pocos segundos, mientras la pestaña está a la vista (sin pisarse: si la anterior no volvió, espera). */
+function usePoll(fn: () => Promise<unknown>, deps: unknown[]) {
   useEffect(() => {
-    fn();
-    const t = setInterval(() => document.visibilityState === "visible" && fn(), POLL_MS);
+    let busy = false;
+    const run = () => {
+      if (busy) return;
+      busy = true;
+      fn()
+        .catch(() => {})
+        .finally(() => (busy = false));
+    };
+    run();
+    const t = setInterval(() => document.visibilityState === "visible" && run(), POLL_MS);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
+}
+
+/**
+ * Lecturas que se repiten (chats y mensajes) por rutas GET y no server actions:
+ * las server actions salen de a una y frenaban al abrir una conversación.
+ */
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok || !res.headers.get("content-type")?.includes("json")) throw new Error(String(res.status));
+  return res.json();
 }
 
 function when(iso: string | null) {
@@ -270,7 +286,9 @@ export function WaInbox({
   const open = (openJid && chats.find((c) => c.jid === openJid)) || (openChat?.jid === openJid ? openChat : null);
 
   const load = useCallback(async () => {
-    const r = await getWaLine(line, q, filter || undefined);
+    const r = await getJson<{ state: WaLineState; chats: WaChat[]; labels: WaLabel[] } | null>(
+      `/api/wa/chats?${new URLSearchParams({ line, q, label: filter })}`,
+    );
     if (!r) return;
     setState(r.state);
     setChats(r.chats);
@@ -448,7 +466,7 @@ export function WaInbox({
         </aside>
         <section className={`min-h-0 flex-col ${open ? "flex" : "hidden md:flex"}`}>
           {open ? (
-            <Conversation key={open.jid} line={line} chat={open} labels={labels} onBack={() => setOpenJid(null)} onSent={load} />
+            <Conversation key={open.jid} line={line} chat={open} labels={labels} onBack={() => setOpenJid(null)} onSent={() => load().catch(() => {})} />
           ) : (
             <div className="m-auto max-w-xs p-6 text-center text-stone-500">
               <p className="text-5xl" aria-hidden>
@@ -539,13 +557,17 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
     setError(null);
     const r = await queueWaSticker(line, chat.jid, path);
     if (!r.ok) return setError(r.error);
-    load();
+    load().catch(() => {});
     onSent();
   }
   const lastCount = useRef(0);
   const atBottom = useRef(true);
 
-  const load = useCallback(async () => setMsgs(await getWaMessages(line, chat.jid)), [line, chat.jid]);
+  const [loaded, setLoaded] = useState(false);
+  const load = useCallback(async () => {
+    setMsgs(await getJson<WaMessage[]>(`/api/wa/mensajes?${new URLSearchParams({ line, jid: chat.jid })}`));
+    setLoaded(true);
+  }, [line, chat.jid]);
   usePoll(load, [load]);
   useEffect(() => {
     if (msgs.length !== lastCount.current) bottom.current?.scrollIntoView({ block: "end" });
@@ -629,7 +651,7 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
     setSending(false);
     setProgress(null);
     setText("");
-    load();
+    load().catch(() => {});
     onSent();
   }
 
@@ -783,7 +805,13 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
             </div>
           );
         })}
-        {!msgs.length && (
+        {!loaded && !msgs.length && (
+          <p className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full bg-white/90 px-4 py-1.5 text-sm text-stone-500 shadow-sm">
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" aria-hidden />
+            Cargando mensajes…
+          </p>
+        )}
+        {loaded && !msgs.length && (
           <p className="mx-auto mt-6 w-fit rounded-full bg-white/90 px-4 py-1.5 text-center text-sm text-stone-500 shadow-sm">Sin mensajes todavía.</p>
         )}
         <div ref={bottom} />
