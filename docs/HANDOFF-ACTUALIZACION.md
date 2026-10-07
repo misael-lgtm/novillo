@@ -779,3 +779,12 @@ El usuario quiere ver todos esos contactos en el tablero.
   - "🔗 Link": copia `abandoned_checkout_url`;
   - "➕ Al tablero": `createCartOrder(cartId)` vuelve a buscar el carrito en el servidor, crea o encuentra al cliente y crea la tarjeta en Interesado, con canal tienda online, el total y la descripción con lo que dejó.
 - **Ojo:** si la app de Tiendanube no tiene permiso para los checkouts, la página lo avisa (401/403).
+
+## 34. PR siguiente (7/10): aviso de carrito abandonado nuevo
+
+- **Pedido:** una alerta cada vez que entra un carrito abandonado nuevo.
+- **`CartAlerts`** (en el layout) revisa `/api/carritos-nuevos` cada 60 s. Esa ruta devuelve los carritos de las últimas 48 h, usando la misma consulta de 30 días que la página, así comparten la caché.
+  - Los ids ya vistos quedan en localStorage (`crm_carritos_vistos`); la primera vez solo se anotan.
+  - Si entra uno nuevo: suena un "ding" (WebAudio, sin archivos) y aparece abajo a la derecha una tarjeta con nombre, monto, productos y los botones "💬 Escribirle" (abre el chat con el mensaje armado) y "Ver" (va a `/carritos` filtrado). Se muestran hasta 3 juntos.
+- `abandonedCarts` redondea `created_at_min` al día, para que la URL (y la caché) sea la misma todo el día.
+- `cartMessage()` arma el mensaje y lo usan la página y el aviso.
