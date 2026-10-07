@@ -716,3 +716,12 @@ El usuario quiere ver todos esos contactos en el tablero.
   - el fondo liso se saca en el navegador: se rellena desde los bordes con el color de las esquinas y se frena en el borde blanco del sticker. Después se recorta y se achica a 420 px como máximo;
   - se guarda como PNG en data URL en la tabla nueva `app_settings` (migración `0013`, ya aplicada): el equipo puede leerla y solo el admin escribirla.
   - **Ojo:** el usuario mandó el sticker de Messi como imagen en el chat. No se puede extraer de ahí, así que lo tiene que subir él. Se le saca solo el fondo; la marca de la tienda que hizo el sticker queda.
+
+## 28. PR siguiente (7/10): iniciar chats nuevos
+
+- **Pedido:** "agregá poder iniciar charlas, que no me está dejando".
+- **Cómo es:**
+  - botón "+ Nuevo chat" al lado del buscador en Teléfonos: se escribe el número en cualquier formato (pasa por `normalizePhoneAR`) y "Abrir chat";
+  - `openWaChatByPhone`: si ya hay un chat con ese celular (aunque esté guardado como @lid), abre ese; si no, abre uno vacío con `549…@s.whatsapp.net`, que se crea con el primer mensaje;
+  - también hay link directo: `/telefonos/<línea>?numero=1123456789`.
+- **Conector:** antes de mandar a un número sin chat, revisa con `onWhatsApp` que tenga WhatsApp. Si no tiene, el mensaje queda con el error "Ese número no tiene WhatsApp". Está en el zip; hace falta actualizar el celu para tenerlo, pero lo demás anda igual sin actualizar.
