@@ -70,7 +70,11 @@ function LabelChip({ label }: { label: WaLabel }) {
   );
 }
 
-const chatTitle = (c: WaChat) => c.customer?.name ?? c.name ?? (c.phone ? formatPhone(c.phone) : "Sin número");
+/** El número de WhatsApp primero; el nombre solo si no se sabe el número. */
+const chatTitle = (c: WaChat) => (c.phone ? formatPhone(c.phone) : (c.customer?.name ?? c.name ?? "Sin número"));
+/** El nombre, chiquito abajo del número (si hay los dos). */
+const chatSubtitle = (c: WaChat) => (c.phone ? (c.customer?.name ?? c.name) : null);
+const MAX_PHOTOS = 30;
 const photoUrl = (path: string) => `/api/wa-media?p=${encodeURIComponent(path)}`;
 
 /** Achica la foto en el navegador (máx. 1600 px, JPG) para que suba rápido. */
@@ -193,7 +197,7 @@ export function WaInbox({ line, short, isAdmin, connectorHelp }: { line: string;
                       <span className="truncate font-semibold">{chatTitle(c)}</span>
                       <span className="shrink-0 text-xs text-stone-500">{when(c.last_at)}</span>
                     </span>
-                    {c.phone && chatTitle(c) !== formatPhone(c.phone) && <span className="block text-xs text-stone-500">{formatPhone(c.phone)}</span>}
+                    {chatSubtitle(c) && <span className="block truncate text-xs text-stone-500">{chatSubtitle(c)}</span>}
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm text-stone-500">{c.last_message}</span>
                       {c.unread > 0 && <span className="shrink-0 rounded-full bg-emerald-500 px-1.5 text-xs font-bold text-white">{c.unread}</span>}
@@ -257,8 +261,9 @@ function QrPanel({ qr, short }: { qr: string; short: string }) {
 function Conversation({ line, chat, labels, onBack, onSent }: { line: string; chat: WaChat; labels: WaLabel[]; onBack: () => void; onSent: () => void }) {
   const [msgs, setMsgs] = useState<WaMessage[]>([]);
   const [text, setText] = useState("");
-  const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [photos, setPhotos] = useState<{ blob: Blob; url: string }[]>([]);
   const [sending, setSending] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
@@ -273,43 +278,71 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
     lastCount.current = msgs.length;
   }, [msgs]);
 
-  useEffect(
-    () => () => {
-      if (photo) URL.revokeObjectURL(photo.url);
-    },
-    [photo],
-  );
+  // Liberar las vistas previas al cerrar el chat.
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
+  useEffect(() => () => photosRef.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
 
-  async function pickPhoto(file: File | undefined) {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return setError("Eso no es una foto.");
+  async function pickPhotos(files: File[]) {
+    const images = files.filter((f) => f.type.startsWith("image/"));
+    if (!images.length) return files.length && setError("Eso no es una foto.");
     setError(null);
-    try {
-      const blob = await shrinkPhoto(file);
-      setPhoto({ blob, url: URL.createObjectURL(blob) });
-    } catch {
-      setError("No se pudo leer la foto. Probá con otra (JPG o PNG).");
+    const room = MAX_PHOTOS - photos.length;
+    if (images.length > room) setError(`Se pueden mandar hasta ${MAX_PHOTOS} fotos juntas: quedaron las primeras.`);
+    const added: { blob: Blob; url: string }[] = [];
+    for (const f of images.slice(0, Math.max(0, room))) {
+      try {
+        const blob = await shrinkPhoto(f);
+        added.push({ blob, url: URL.createObjectURL(blob) });
+      } catch {
+        setError("Alguna foto no se pudo leer. Probá con JPG o PNG.");
+      }
     }
+    setPhotos((prev) => [...prev, ...added].slice(0, MAX_PHOTOS));
+  }
+
+  function removePhoto(i: number) {
+    URL.revokeObjectURL(photos[i].url);
+    setPhotos((prev) => prev.filter((_, j) => j !== i));
   }
 
   async function send() {
     const body = text.trim();
-    if ((!body && !photo) || sending) return;
+    if ((!body && !photos.length) || sending) return;
     setSending(true);
     setError(null);
-    let r;
-    if (photo) {
-      const form = new FormData();
-      form.set("line", line);
-      form.set("jid", chat.jid);
-      form.set("caption", body);
-      form.set("file", new File([photo.blob], "foto.jpg", { type: "image/jpeg" }));
-      r = await sendWaPhoto(form);
-    } else r = await sendWaMessage(line, chat.jid, body);
+    if (photos.length) {
+      // De a una, en orden. El texto va con la primera. Si una falla, quedan las que faltan para reintentar.
+      for (let i = 0; i < photos.length; i++) {
+        setProgress(photos.length > 1 ? `Subiendo ${i + 1} de ${photos.length}…` : null);
+        const form = new FormData();
+        form.set("line", line);
+        form.set("jid", chat.jid);
+        form.set("caption", i === 0 ? body : "");
+        form.set("file", new File([photos[i].blob], "foto.jpg", { type: "image/jpeg" }));
+        const r = await sendWaPhoto(form);
+        if (!r.ok) {
+          photos.slice(0, i).forEach((p) => URL.revokeObjectURL(p.url));
+          setPhotos(photos.slice(i));
+          if (i > 0) setText("");
+          setSending(false);
+          setProgress(null);
+          load();
+          return setError(`${r.error}${i > 0 ? ` (salieron ${i}; quedan ${photos.length - i})` : ""}`);
+        }
+      }
+      photos.forEach((p) => URL.revokeObjectURL(p.url));
+      setPhotos([]);
+    } else {
+      const r = await sendWaMessage(line, chat.jid, body);
+      if (!r.ok) {
+        setSending(false);
+        return setError(r.error);
+      }
+    }
     setSending(false);
-    if (!r.ok) return setError(r.error);
+    setProgress(null);
     setText("");
-    setPhoto(null);
     load();
     onSent();
   }
@@ -322,7 +355,7 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
   }
 
   const title = chatTitle(chat);
-  const showPhone = chat.phone && title !== formatPhone(chat.phone);
+  const subtitle = chatSubtitle(chat);
   return (
     <>
       <header className="flex items-center gap-3 border-b border-stone-200 px-3 py-2.5">
@@ -332,18 +365,18 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{title}</p>
           <p className="truncate text-xs text-stone-500">
-            {showPhone ? formatPhone(chat.phone!) : ""}
+            {subtitle ?? ""}
             {chat.customer ? (
               <>
-                {showPhone ? " · " : ""}
+                {subtitle ? " · " : ""}
                 <Link href={`/clientes/${chat.customer.id}`} className="underline">
-                  ver cliente en el CRM
+                  ver ficha en el CRM
                 </Link>
               </>
             ) : (
               chat.phone && (
                 <>
-                  {showPhone ? " · " : ""}
+                  {subtitle ? " · " : ""}
                   <Link href={`/pedidos/nuevo`} className="underline">
                     no está en el CRM: cargar pedido
                   </Link>
@@ -431,13 +464,41 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
         }}
         className="border-t border-stone-200 p-2"
       >
-        {photo && (
-          <div className="mb-2 flex items-start gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo.url} alt="Foto para mandar" className="h-24 rounded-lg border border-stone-200" />
-            <button type="button" onClick={() => setPhoto(null)} className="text-sm text-stone-500 underline">
-              Sacar foto
-            </button>
+        {photos.length > 0 && (
+          <div className="mb-2">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {photos.map((p, i) => (
+                <div key={p.url} className="relative shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt="Foto para mandar" className="h-20 rounded-lg border border-stone-200" />
+                  {!sending && (
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="absolute right-1 top-1 rounded-full bg-black/60 px-1.5 text-xs font-bold text-white"
+                      aria-label={`Sacar foto ${i + 1}`}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-stone-500">
+              {progress ?? `${photos.length} ${photos.length === 1 ? "foto" : "fotos"} (hasta ${MAX_PHOTOS}).`}{" "}
+              {!sending && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    photos.forEach((p) => URL.revokeObjectURL(p.url));
+                    setPhotos([]);
+                  }}
+                  className="underline"
+                >
+                  Sacar todas
+                </button>
+              )}
+            </p>
           </div>
         )}
         <div className="flex items-end gap-2">
@@ -445,14 +506,21 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
             ref={fileInput}
             type="file"
             accept="image/*"
+            multiple
             className="hidden"
-            aria-label="Elegir foto"
+            aria-label="Elegir fotos"
             onChange={(e) => {
-              pickPhoto(e.target.files?.[0]);
+              pickPhotos([...(e.target.files ?? [])]);
               e.target.value = "";
             }}
           />
-          <button type="button" onClick={() => fileInput.current?.click()} className="btn-secondary px-3 py-2" aria-label="Mandar foto" title="Mandar foto">
+          <button
+            type="button"
+            onClick={() => fileInput.current?.click()}
+            className="btn-secondary px-3 py-2"
+            aria-label="Mandar fotos"
+            title="Mandar fotos (hasta 30)"
+          >
             📷
           </button>
           <textarea
@@ -465,18 +533,18 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
               }
             }}
             onPaste={(e) => {
-              const f = [...e.clipboardData.files].find((x) => x.type.startsWith("image/"));
-              if (f) {
+              const files = [...e.clipboardData.files].filter((x) => x.type.startsWith("image/"));
+              if (files.length) {
                 e.preventDefault();
-                pickPhoto(f);
+                pickPhotos(files);
               }
             }}
             rows={1}
-            placeholder={photo ? "Texto de la foto (opcional)" : "Escribí un mensaje (Enter manda, Shift+Enter baja de línea)"}
+            placeholder={photos.length ? "Texto para la primera foto (opcional)" : "Escribí un mensaje (Enter manda, Shift+Enter baja de línea)"}
             className="input max-h-32 min-h-10 flex-1 resize-y py-2"
             aria-label="Mensaje"
           />
-          <button type="submit" disabled={sending || (!text.trim() && !photo)} className="btn-primary py-2">
+          <button type="submit" disabled={sending || (!text.trim() && !photos.length)} className="btn-primary py-2">
             {sending ? "…" : "Mandar"}
           </button>
         </div>
