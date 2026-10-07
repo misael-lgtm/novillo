@@ -656,3 +656,11 @@ El usuario quiere ver todos esos contactos en el tablero.
 - **En el mismo PR:**
   - **Hasta 30 fotos juntas:** el selector permite varias y se pueden pegar varias. Hay vista previa con ✕ por foto y "Sacar todas". Se suben de a una, con el texto solo en la primera; si una falla, quedan las que faltan. El conector deja 1 s entre foto y foto.
   - **Número como título del chat:** a pedido del usuario. El nombre va chiquito abajo; si no se sabe el número, el título es el nombre.
+
+## 24. PR siguiente (7/10): fotos más rápidas
+
+- **Por qué:** el usuario preguntó "¿por qué tiene un delay?". La foto salía de la cola hacia WhatsApp en 2 o 3 s, pero cada subida pasaba por el server action de Vercel, de a una, y tardaba de 4 a 6 s.
+- **Cómo es ahora:**
+  - el navegador sube directo a Storage (`createClient()` de `supabase/client`), de a 4 a la vez y con un reintento, a `out/<línea>/<uuid>.jpg`. La política `wa_media_upload` lo permite;
+  - después `queueWaPhotos(line, jid, caption, paths)` valida las rutas y mete todas en la cola de una. Cada una lleva 1 ms más de `created_at`, así salen en orden;
+  - se sacó `sendWaPhoto` y `next.config.ts` volvió a estar vacío.
