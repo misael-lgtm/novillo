@@ -1,7 +1,7 @@
 // node --test wa-conector/mensajes.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatJid, contentOf, dateOf, imageOf, mediaOf, nameOf, phoneOf, toRow } from "./mensajes.mjs";
+import { chatJid, contentOf, dateOf, imageOf, mediaOf, nameOf, phoneOf, statusOf, toRow } from "./mensajes.mjs";
 
 test("chat: número normal, con el :dispositivo sacado", () => {
   assert.equal(chatJid({ remoteJid: "5491123456789:3@s.whatsapp.net" }), "5491123456789@s.whatsapp.net");
@@ -90,4 +90,14 @@ test("archivos: foto, sticker, audio de voz, documento raro; texto no", () => {
     ext: "bin",
   });
   assert.equal(mediaOf({ conversation: "hola" }), null);
+});
+
+test("estado del mensaje: enviado, entregado, visto; lo demás no", () => {
+  assert.equal(statusOf(2), 2);
+  assert.equal(statusOf(4), 4);
+  assert.equal(statusOf("READ"), 4);
+  assert.equal(statusOf("DELIVERY_ACK"), 3);
+  assert.equal(statusOf(1), null);
+  assert.equal(statusOf(0), null);
+  assert.equal(statusOf(undefined), null);
 });

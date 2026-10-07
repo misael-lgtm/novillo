@@ -174,22 +174,27 @@ const BackIcon = () => (
     <path d="M15 6l-6 6 6 6" />
   </svg>
 );
-/** Tilde de enviado (dos tildes cuando ya salió por WhatsApp). */
-const Ticks = () => (
-  <svg
-    viewBox="0 0 18 12"
-    width={15}
-    height={10}
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={1.8}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-label="enviado"
-  >
-    <path d="m1 6.5 3.5 3.5L11 2.5M7.5 10 14 2.5" />
-  </svg>
-);
+/** Tildes como en WhatsApp: ✓ enviado, ✓✓ gris le llegó, ✓✓ celeste lo vio. Sin dato (mensajes viejos): ✓✓ gris. */
+function Ticks({ status }: { status?: number | null }) {
+  const read = (status ?? 0) >= 4;
+  const one = status === 2;
+  return (
+    <svg
+      viewBox="0 0 18 12"
+      width={16}
+      height={11}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={read ? "text-sky-500" : ""}
+      aria-label={read ? "visto" : one ? "enviado" : "entregado"}
+    >
+      <path d={one ? "m3 6.5 3.5 3.5L13 2.5" : "m1 6.5 3.5 3.5L11 2.5M7.5 10 14 2.5"} />
+    </svg>
+  );
+}
 
 /** "Hoy", "Ayer" o la fecha, para separar los mensajes por día. */
 function dayLabel(iso: string) {
@@ -767,6 +772,18 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
           atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
       >
+        {loaded && (
+          <div className="mb-3 flex justify-center">
+            <button
+              type="button"
+              onClick={askHistory}
+              disabled={askedHistory}
+              className="rounded-full bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm hover:bg-white disabled:text-stone-500"
+            >
+              {askedHistory ? "⏳ Pidiendo mensajes anteriores al celu…" : "⬆️ Traer mensajes anteriores"}
+            </button>
+          </div>
+        )}
         {msgs.map((m, i) => {
           const prev = msgs[i - 1];
           const newDay = !prev || new Date(prev.at).toDateString() !== new Date(m.at).toDateString();
@@ -794,7 +811,7 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
                   <span className={m.media_path ? (text ? "block px-2 pb-1 pt-1.5" : "") : ""}>
                     {text}
                     {/* Hueco para que la hora no pise el texto */}
-                    <span className="inline-block w-16" aria-hidden />
+                    <span className="inline-block w-[4.75rem]" aria-hidden />
                   </span>
                   <span
                     className={`absolute bottom-1 right-2 flex items-center gap-1 text-[11px] ${
@@ -808,14 +825,7 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
                     ) : (
                       <>
                         {hourOf(m.at)}
-                        {m.from_me &&
-                          (m.pending ? (
-                            <span aria-label="enviando">🕓</span>
-                          ) : (
-                            <span className="text-sky-600">
-                              <Ticks />
-                            </span>
-                          ))}
+                        {m.from_me && (m.pending ? <span aria-label="enviando">🕓</span> : <Ticks status={m.status} />)}
                       </>
                     )}
                   </span>
@@ -824,18 +834,6 @@ function Conversation({ line, chat, labels, onBack, onSent }: { line: string; ch
             </div>
           );
         })}
-        {loaded && (
-          <div className="mb-3 flex justify-center">
-            <button
-              type="button"
-              onClick={askHistory}
-              disabled={askedHistory}
-              className="rounded-full bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm hover:bg-white disabled:text-stone-500"
-            >
-              {askedHistory ? "⏳ Pidiendo mensajes anteriores al celu…" : "⬆️ Traer mensajes anteriores"}
-            </button>
-          </div>
-        )}
         {!loaded && !msgs.length && (
           <p className="mx-auto mt-6 flex w-fit items-center gap-2 rounded-full bg-white/90 px-4 py-1.5 text-sm text-stone-500 shadow-sm">
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" aria-hidden />

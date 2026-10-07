@@ -755,3 +755,13 @@ El usuario quiere ver todos esos contactos en el tablero.
   - **"⬆️ Traer mensajes anteriores":** botón arriba de la conversación, que se dispara solo si el chat tiene menos de 30 mensajes (una vez por chat y por pestaña). Crea una fila en `wa_history_requests` (migración `0015`, ya aplicada).
   - **Conector:** toma el mensaje más viejo guardado y llama `sock.fetchMessageHistory(50, key, ts)` por el número y por el @lid. Lo que vuelve llega por `messaging-history.set` con `syncType ON_DEMAND` y se guarda sin el límite de días. Hay que actualizar el celu para tenerlo.
 - **No probado contra WhatsApp real:** si el celu responde al pedido ON_DEMAND con el jid que se manda.
+
+## 32. PR siguiente (7/10): tildes de visto como en WhatsApp
+
+- **Pedido:** que marque cuando lo vieron (celeste) y cuando no (gris).
+- **Base:** migración `0016_wa_vistos` (ya aplicada): `wa_messages.status` (2 enviado, 3 entregado, 4 visto, 5 escuchado) y `wa_mark_status(line, ids[], status)`, que nunca baja el estado y solo la puede usar la service key.
+- **Conector:**
+  - `statusOf()` en mensajes.mjs (con test) traduce el estado;
+  - `markStatus()` se llama con los eventos `messages.update` (los avisos de llegó y visto), con lo que entra por `messages.upsert` y el historial, y con 2 apenas sale un mensaje de la cola.
+  - Hay que actualizar el celu para que llegue.
+- **CRM:** `Ticks` muestra ✓ gris si está enviado, ✓✓ gris si se entregó o no hay dato (mensajes viejos) y ✓✓ `text-sky-500` si lo vieron. Además el botón "Traer mensajes anteriores" pasó arriba de todo y se agrandó el hueco de la hora.
