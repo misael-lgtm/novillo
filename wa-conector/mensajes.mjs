@@ -138,6 +138,13 @@ export function dateOf(msg) {
   return Number.isFinite(secs) && secs > 0 ? new Date(secs * 1000) : new Date();
 }
 
+const STATUS_NAMES = { ERROR: 0, PENDING: 1, SERVER_ACK: 2, DELIVERY_ACK: 3, READ: 4, PLAYED: 5 };
+/** Estado de un mensaje nuestro (2 enviado, 3 le llegó, 4 lo vio, 5 escuchó), o null si no viene. */
+export function statusOf(status) {
+  const n = typeof status === "number" ? status : typeof status === "string" ? STATUS_NAMES[status] : null;
+  return Number.isInteger(n) && n >= 2 && n <= 5 ? n : null;
+}
+
 /** Fila de wa_messages, o null si el mensaje no va (grupo, reacción, etc.). */
 export function toRow(line, msg) {
   const jid = chatJid(msg?.key);

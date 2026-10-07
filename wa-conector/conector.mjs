@@ -24,7 +24,7 @@ import makeWASocket, {
 } from "baileys";
 import { createClient } from "@supabase/supabase-js";
 import pino from "pino";
-import { chatJid, mediaOf, nameOf, normalizeJid, phoneOf, toRow } from "./mensajes.mjs";
+import { chatJid, mediaOf, nameOf, normalizeJid, phoneOf, statusOf, toRow } from "./mensajes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -110,6 +110,21 @@ async function saveMedia(line, m) {
   } catch (e) {
     log(line, `no se pudo guardar un archivo (${media.kind}):`, e.message);
     return null;
+  }
+}
+
+/** Tildes de nuestros mensajes (✓ enviado, ✓✓ le llegó, ✓✓ celeste lo vio). Nunca baja el estado. */
+async function markStatus(line, items) {
+  const byStatus = new Map();
+  for (const { id, status } of items) {
+    const st = statusOf(status);
+    if (id && st) byStatus.set(st, [...(byStatus.get(st) ?? []), id]);
+  }
+  for (const [st, ids] of byStatus) {
+    for (let i = 0; i < ids.length; i += 500) {
+      const { error } = await db.rpc("wa_mark_status", { p_line: line, p_ids: ids.slice(i, i + 500), p_status: st });
+      if (error) log(line, "no se pudieron marcar los vistos:", error.message);
+    }
   }
 }
 
@@ -325,12 +340,33 @@ async function startLine(line) {
     }
   });
 
-  sock.ev.on("messages.upsert", ({ messages }) => saveMessages(line, messages).catch((e) => log(line, e.message)));
+  sock.ev.on("messages.upsert", async ({ messages }) => {
+    try {
+      await saveMessages(line, messages);
+      await markStatus(
+        line,
+        messages.filter((m) => m.key?.fromMe).map((m) => ({ id: m.key.id, status: m.status })),
+      );
+    } catch (e) {
+      log(line, e.message);
+    }
+  });
+  // Avisos de WhatsApp: le llegó / lo vio.
+  sock.ev.on("messages.update", (updates) =>
+    markStatus(
+      line,
+      updates.filter((u) => u.key?.fromMe && u.update?.status != null).map((u) => ({ id: u.key.id, status: u.update.status })),
+    ).catch((e) => log(line, e.message)),
+  );
   sock.ev.on("messaging-history.set", async ({ messages, contacts, chats, syncType }) => {
     try {
       const onDemand = syncType === proto.HistorySync.HistorySyncType.ON_DEMAND;
       if (onDemand) log(line, `llegaron ${messages.length} mensajes anteriores`);
       await saveMessages(line, messages, { history: true, onDemand });
+      await markStatus(
+        line,
+        messages.filter((m) => m.key?.fromMe).map((m) => ({ id: m.key.id, status: m.status })),
+      );
       await saveContacts(line, [...(contacts ?? []), ...(chats ?? [])]);
     } catch (e) {
       log(line, e.message);
@@ -410,6 +446,7 @@ async function tick() {
           { onConflict: "line,id" },
         );
         await db.from("wa_outbox").update({ sent_at: at, wa_id: sent.key.id }).eq("id", p.id);
+        await markStatus(p.line, [{ id: sent.key.id, status: 2 }]);
         await db.rpc("wa_touch_chat", {
           p_line: p.line,
           p_jid: p.jid,

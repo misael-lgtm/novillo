@@ -43,6 +43,8 @@ export type WaMessage = {
   sent_by: string | null;
   /** foto guardada (se ve por /api/wa-media) */
   media_path?: string | null;
+  /** Mensajes nuestros: 2 enviado (✓), 3 le llegó (✓✓ gris), 4 o 5 lo vio (✓✓ celeste). null si no se sabe. */
+  status?: number | null;
   pending?: boolean;
   error?: string | null;
 };
@@ -152,7 +154,7 @@ export async function getWaMessages(line: string, jid: string): Promise<WaMessag
   const [{ data: msgs }, { data: queued }] = await Promise.all([
     supabase
       .from("wa_messages")
-      .select("id, from_me, body, kind, at, sent_by, media_path")
+      .select("id, from_me, body, kind, at, sent_by, media_path, status")
       .eq("line", line)
       .in("jid", jids)
       .order("at", { ascending: false })
