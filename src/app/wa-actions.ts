@@ -93,38 +93,79 @@ export async function getWaLine(line: string, q?: string, label?: string): Promi
     const { data: cs } = await supabase.from("customers").select("id, name, phone").in("phone", phones).is("archived_at", null);
     for (const c of cs ?? []) if (c.phone) customerOf.set(c.phone, { id: c.id, name: c.name });
   }
+  // Un chat por celular (ver sameChatJids): queda el más reciente, con los no leídos y etiquetas de los dos.
+  const merged: Omit<WaChat, "customer">[] = [];
+  const byPhone = new Map<string, Omit<WaChat, "customer">>();
+  for (const c of chats ?? []) {
+    const first = c.phone ? byPhone.get(c.phone) : undefined;
+    if (!first) {
+      const copy = { ...c, labels: withPending(c) };
+      merged.push(copy);
+      if (c.phone) byPhone.set(c.phone, copy);
+      continue;
+    }
+    first.unread += c.unread;
+    first.labels = [...new Set([...first.labels, ...withPending(c)])];
+    first.name ??= c.name;
+  }
   return {
     state,
     labels: labels ?? [],
-    chats: (chats ?? []).map((c) => ({
-      ...c,
-      labels: withPending(c),
-      customer: c.phone ? (customerOf.get(c.phone) ?? null) : null,
-    })),
+    chats: merged.map((c) => ({ ...c, customer: c.phone ? (customerOf.get(c.phone) ?? null) : null })),
   };
+}
+
+/**
+ * WhatsApp a veces guarda a la misma persona con dos identificadores (el número y un "@lid"):
+ * todos los chats del mismo celular en ese teléfono se muestran como una sola conversación.
+ */
+async function sameChatJids(supabase: Awaited<ReturnType<typeof requireMember>>["supabase"], line: string, jid: string): Promise<string[]> {
+  const { data: chat } = await supabase.from("wa_chats").select("phone").eq("line", line).eq("jid", jid).maybeSingle();
+  if (!chat?.phone) return [jid];
+  const { data } = await supabase.from("wa_chats").select("jid").eq("line", line).eq("phone", chat.phone);
+  return [...new Set([jid, ...(data ?? []).map((c) => c.jid as string)])];
+}
+
+/** Pedirle al celu los mensajes anteriores de un chat (el conector lo hace en unos segundos). */
+export async function requestWaHistory(line: string, jid: string): Promise<ActionResult> {
+  if (!validLine(line)) return { ok: false, error: "Teléfono inválido." };
+  if (!validJid(jid)) return { ok: false, error: "Chat inválido." };
+  const { supabase, me } = await requireMember();
+  // Si ya se pidió hace menos de 2 minutos, no repetir.
+  const { count } = await supabase
+    .from("wa_history_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("line", line)
+    .eq("jid", jid)
+    .gt("created_at", new Date(Date.now() - 120_000).toISOString());
+  if (count) return { ok: true };
+  const { error } = await supabase.from("wa_history_requests").insert({ line, jid, created_by: me.email });
+  if (error) return { ok: false, error: "No se pudo pedir." };
+  return { ok: true };
 }
 
 /** Mensajes de un chat (los últimos 200) y lo marca como leído. Incluye los que todavía están en la cola. */
 export async function getWaMessages(line: string, jid: string): Promise<WaMessage[]> {
   if (!validLine(line) || !jid) return [];
   const { supabase } = await requireMember();
+  const jids = await sameChatJids(supabase, line, jid);
   const [{ data: msgs }, { data: queued }] = await Promise.all([
     supabase
       .from("wa_messages")
       .select("id, from_me, body, kind, at, sent_by, media_path")
       .eq("line", line)
-      .eq("jid", jid)
+      .in("jid", jids)
       .order("at", { ascending: false })
-      .limit(200),
+      .limit(500),
     supabase
       .from("wa_outbox")
       .select("id, body, created_at, created_by, error, media_path")
       .eq("line", line)
-      .eq("jid", jid)
+      .in("jid", jids)
       .is("sent_at", null)
       .order("created_at"),
   ]);
-  await supabase.from("wa_chats").update({ read_at: new Date().toISOString() }).eq("line", line).eq("jid", jid);
+  await supabase.from("wa_chats").update({ read_at: new Date().toISOString() }).eq("line", line).in("jid", jids);
   return [
     ...(msgs ?? []).reverse(),
     ...(queued ?? []).map((o) => ({
