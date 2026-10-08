@@ -76,7 +76,9 @@ export async function getWaLine(line: string, q?: string, label?: string): Promi
     const digits = term.replace(/\D/g, "");
     query = query.or([`name.ilike.%${term}%`, ...(digits.length >= 3 ? [`phone.ilike.%${digits}%`] : [])].join(","));
   }
-  if (label) query = query.contains("labels", [label]);
+  // "no-leidos": solo los chats con mensajes sin leer; si no, una etiqueta de WhatsApp Business.
+  if (label === "no-leidos") query = query.gt("unread", 0);
+  else if (label) query = query.contains("labels", [label]);
   const [{ data: chats }, { data: labels }, { data: ops }] = await Promise.all([
     query.returns<Omit<WaChat, "customer">[]>(),
     supabase.from("wa_labels").select("id, name, color").eq("line", line).eq("deleted", false).order("name").returns<WaLabel[]>(),

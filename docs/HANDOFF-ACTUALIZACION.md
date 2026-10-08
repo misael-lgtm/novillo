@@ -811,3 +811,8 @@ El usuario quiere ver todos esos contactos en el tablero.
   - "📱 Teléfonos" en el menú muestra el total (en el celu, sobre el 📱).
 - **Cómo:** `UnreadBadge` / `useUnread` (`src/components/UnreadBadges.tsx`) pide `/api/wa/no-leidos` cada 20 s y lo comparte entre las pestañas y el menú. La ruta cuenta una vez por persona, juntando el número y el @lid.
 - **Cambio en "sin leer"** (migración `0018`, ya aplicada con `create or replace`): ahora cuenta lo que el cliente escribió después de la última respuesta nuestra (desde el CRM o desde el celu) y después de abrirlo en el CRM. Antes contaba todo lo que no se había abierto en el CRM, y por eso Carritos daba 390 chats; con la regla nueva son unos 52.
+
+## 37. PR siguiente (8/10): filtro "No leídos"
+
+- **Pedido:** al lado de las listas/etiquetas, un "No leídos" para ver solo los chats sin leer.
+- **Cómo:** en la fila de filtros quedó Todos · No leídos · etiquetas, y ahora se muestra aunque el teléfono no tenga etiquetas. El filtro especial `"no-leidos"` (`UNREAD_FILTER`) hace que `getWaLine` filtre con `unread > 0` en vez de buscar por etiqueta. Si no hay ninguno, dice "No hay chats sin leer 🎉".
