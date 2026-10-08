@@ -236,6 +236,8 @@ const chatTitle = (c: WaChat) => (c.phone ? formatPhone(c.phone) : (c.customer?.
 /** El nombre, chiquito abajo del número (si hay los dos). */
 const chatSubtitle = (c: WaChat) => (c.phone ? (c.customer?.name ?? c.name) : null);
 const MAX_PHOTOS = 30;
+/** Filtro especial de la fila de etiquetas: solo los chats sin leer. */
+const UNREAD_FILTER = "no-leidos";
 const photoUrl = (path: string) => `/api/wa-media?p=${encodeURIComponent(path)}`;
 
 /** Achica la foto en el navegador (máx. 1600 px, JPG) para que suba rápido. */
@@ -422,23 +424,25 @@ export function WaInbox({
                 </button>
               </form>
             )}
-            {labels.length > 0 && (
-              <div className="flex gap-1.5 overflow-x-auto pb-0.5" role="group" aria-label="Filtrar por etiqueta">
-                {[{ id: "", name: "Todos", color: null } as WaLabel, ...labels].map((l) => (
-                  <button
-                    key={l.id || "todos"}
-                    onClick={() => setFilter(l.id)}
-                    aria-pressed={filter === l.id}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition ${
-                      filter === l.id ? "bg-emerald-600 text-white shadow-sm" : "bg-stone-100 text-stone-700 hover:bg-stone-200"
-                    }`}
-                  >
-                    {l.id && <span className="h-2 w-2 rounded-full" style={{ background: labelColor(l) }} aria-hidden />}
-                    {l.name}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5" role="group" aria-label="Filtrar por etiqueta">
+              {[{ id: "", name: "Todos", color: null } as WaLabel, { id: UNREAD_FILTER, name: "No leídos", color: null } as WaLabel, ...labels].map((l) => (
+                <button
+                  key={l.id || "todos"}
+                  onClick={() => setFilter(l.id)}
+                  aria-pressed={filter === l.id}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                    filter === l.id ? "bg-emerald-600 text-white shadow-sm" : "bg-stone-100 text-stone-700 hover:bg-stone-200"
+                  }`}
+                >
+                  {l.id === UNREAD_FILTER ? (
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                  ) : (
+                    l.id && <span className="h-2 w-2 rounded-full" style={{ background: labelColor(l) }} aria-hidden />
+                  )}
+                  {l.name}
+                </button>
+              ))}
+            </div>
           </div>
           <ul className="min-h-0 flex-1 overflow-y-auto">
             {chats.map((c) => (
@@ -489,7 +493,7 @@ export function WaInbox({
                 </button>
               </li>
             ))}
-            {!chats.length && <li className="p-8 text-center text-sm text-stone-500">{q || filter ? "No hay chats con eso." : "Todavía no hay chats."}</li>}
+            {!chats.length && <li className="p-8 text-center text-sm text-stone-500">{filter === UNREAD_FILTER ? "No hay chats sin leer 🎉" : q || filter ? "No hay chats con eso." : "Todavía no hay chats."}</li>}
           </ul>
         </aside>
         <section className={`min-h-0 flex-col ${open ? "flex" : "hidden md:flex"}`}>
