@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { PHONE_LINES } from "@/lib/config";
 import { requireMember } from "@/lib/session";
 import { WaInbox } from "@/components/WaInbox";
+import { UnreadBadge } from "@/components/UnreadBadges";
 
 /** Pestañas Carritos / Güemes / Palermo: vincular por QR y chatear desde el CRM. */
 export default async function TelefonoPage({ params, searchParams }: { params: Promise<{ linea: string }>; searchParams: Promise<{ numero?: string; texto?: string }> }) {
@@ -29,6 +30,7 @@ export default async function TelefonoPage({ params, searchParams }: { params: P
             className={`flex-1 rounded-lg px-3 py-2 text-center text-sm font-semibold ${l.id === line.id ? "bg-white shadow-sm" : "text-stone-500 hover:text-stone-900"}`}
           >
             {l.label}
+            <UnreadBadge line={l.id} />
           </Link>
         ))}
       </nav>

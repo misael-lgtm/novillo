@@ -802,3 +802,12 @@ El usuario quiere ver todos esos contactos en el tablero.
   - en Teléfonos, `AdCounter` muestra "📣 Anuncios hoy: N" con el cuadrito "Ayer N" y, al tocarlo, el detalle por anuncio;
   - en la lista de chats se ve el chip "📣 Anuncio".
 - **Arranca de cero:** solo cuenta desde que el celu tenga el conector actualizado.
+
+## 36. PR siguiente (8/10): sin leer al lado de cada teléfono
+
+- **Pedido:** que al lado de cada número figuren los mensajes sin leer.
+- **Qué se ve:**
+  - las pestañas Teléfono Carritos, Güemes y Palermo muestran un circulito verde con la cantidad de **chats** sin leer;
+  - "📱 Teléfonos" en el menú muestra el total (en el celu, sobre el 📱).
+- **Cómo:** `UnreadBadge` / `useUnread` (`src/components/UnreadBadges.tsx`) pide `/api/wa/no-leidos` cada 20 s y lo comparte entre las pestañas y el menú. La ruta cuenta una vez por persona, juntando el número y el @lid.
+- **Cambio en "sin leer"** (migración `0018`, ya aplicada con `create or replace`): ahora cuenta lo que el cliente escribió después de la última respuesta nuestra (desde el CRM o desde el celu) y después de abrirlo en el CRM. Antes contaba todo lo que no se había abierto en el CRM, y por eso Carritos daba 390 chats; con la regla nueva son unos 52.

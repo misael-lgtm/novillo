@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
+import { UnreadBadge } from "./UnreadBadges";
 
 const LINKS = [
   { href: "/", label: "Hoy", icon: "☀️" },
@@ -45,6 +46,7 @@ export function Nav({ name, isAdmin, shared }: { name: string; isAdmin: boolean;
               className={`rounded-lg px-3 py-2 text-sm font-medium ${active("/telefonos") ? "bg-stone-900 text-white" : "hover:bg-stone-100"}`}
             >
               📱 Teléfonos
+              <UnreadBadge total />
             </Link>
             <Link
               href="/carritos"
@@ -57,8 +59,11 @@ export function Nav({ name, isAdmin, shared }: { name: string; isAdmin: boolean;
             <Link href="/carritos" className="text-lg md:hidden" aria-label="Carritos abandonados" title="Carritos abandonados">
               🛒
             </Link>
-            <Link href="/telefonos/carritos" className="text-lg md:hidden" aria-label="Teléfonos" title="Teléfonos">
+            <Link href="/telefonos/carritos" className="relative text-lg md:hidden" aria-label="Teléfonos" title="Teléfonos">
               📱
+              <span className="absolute -right-3 -top-2 scale-90">
+                <UnreadBadge total />
+              </span>
             </Link>
             <ThemeToggle />
             {isAdmin && (
