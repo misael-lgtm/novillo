@@ -198,3 +198,15 @@ export function trackingLink(carrier: string | null, code: string | null) {
   const c = CARRIERS.find((x) => x.id === carrier);
   return c && code ? c.trackingUrl + encodeURIComponent(code) : null;
 }
+
+/**
+ * Mensaje automático a los pedidos de Tiendanube por transferencia que siguen sin acreditar.
+ * Sale desde ese teléfono, una sola vez por pedido, a partir de los 30 minutos de creado
+ * (y hasta 3 horas después, para no escribirle a pedidos viejos).
+ */
+export const AUTO_TRANSFER = {
+  line: "guemes",
+  afterMinutes: 30,
+  untilMinutes: 180,
+  body: "Hola como va? Te hablo de administracion de Wayfarer vimos que tenes una transferencia pendiente y queriamos saber si la vas a finalizar, mas que nada por que tenemos el producto reservado en la orden y sino tenemos que disponer de el.\nNos podrias confirmar?",
+} as const;
