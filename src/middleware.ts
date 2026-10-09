@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth"];
+// /api/auto: la llama el reloj de la base (pg_cron); se valida con su propia clave.
+const PUBLIC_PATHS = ["/login", "/auth", "/api/auto/"];
 
 import { SUPABASE_ANON_KEY as SUPABASE_KEY, SUPABASE_URL, looksLikeKey } from "@/lib/supabase/env";
 

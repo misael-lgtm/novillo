@@ -816,3 +816,16 @@ El usuario quiere ver todos esos contactos en el tablero.
 
 - **Pedido:** al lado de las listas/etiquetas, un "No leídos" para ver solo los chats sin leer.
 - **Cómo:** en la fila de filtros quedó Todos · No leídos · etiquetas, y ahora se muestra aunque el teléfono no tenga etiquetas. El filtro especial `"no-leidos"` (`UNREAD_FILTER`) hace que `getWaLine` filtre con `unread > 0` en vez de buscar por etiqueta. Si no hay ninguno, dice "No hay chats sin leer 🎉".
+
+## 38. PR siguiente (9/10): mensaje automático a las transferencias pendientes
+
+- **Pedido:** a toda transferencia nueva, hablarle a los 30 minutos. Automático, desde el Teléfono Güemes y con el texto de /pendiente que pasó el usuario.
+- **Cómo:**
+  - **Reloj:** `pg_cron` en Supabase (migración `0019b`) llama cada 5 minutos a `GET /api/auto/transferencias?key=…`.
+  - **Clave:** se genera sola y vive en `crm_private.secrets`, a la que nadie tiene acceso. La ruta es pública en el middleware y la valida con `auto_check_key`.
+  - **Ruta:** `pendingTransferOrders()` en `tiendanube.ts` trae los pedidos creados en las últimas 3 horas con pago pendiente, que no estén cancelados y que sean por transferencia (`gateway_name`, `payment_details.method` o `gateway` con transfer, depósito, cbu, alias o wire). Toma los que tengan entre 30 y 180 minutos.
+  - **Cola:** por cada pedido con celular, `auto_queue_transfer(...)` (security definer) lo anota en `wa_auto_messages` (uno por pedido) y deja el mensaje en `wa_outbox`, con `created_by = 'automático'`.
+- **Configuración:** `AUTO_TRANSFER` en `src/lib/config.ts` (teléfono, minutos y texto).
+- **En el chat:** los mensajes automáticos llevan un 🤖 al lado de la hora.
+- **Probado** con una Tiendanube de prueba: manda solo los pedidos por transferencia pendientes de entre 30 min y 3 h, no repite, y rechaza la clave equivocada.
+- **No probado:** contra la Tiendanube real, por cómo nombra el medio de pago. Si no detecta los pedidos, revisar qué devuelve `/api/auto/transferencias` (`pendientes`).

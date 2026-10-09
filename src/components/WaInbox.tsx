@@ -876,6 +876,7 @@ function Conversation({
                       <span className="font-semibold text-rose-700">✗ no salió</span>
                     ) : (
                       <>
+                        {m.sent_by === "automático" && <span title="Mensaje automático (transferencia pendiente)">🤖</span>}
                         {hourOf(m.at)}
                         {m.from_me && (m.pending ? <span aria-label="enviando">🕓</span> : <Ticks status={m.status} />)}
                       </>

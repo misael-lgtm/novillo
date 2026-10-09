@@ -341,3 +341,53 @@ export function cartMessage(c: TnCart, seller: string): string {
   const first = (c.name ?? "").split(" ")[0];
   return `Hola${first ? ` ${first}` : ""}! Te habla ${seller} de Wayfarer 🤙 Vimos que te quedó en el carrito ${cartSummary(c)}. ¿Te ayudo a terminar la compra?${c.url ? ` Acá lo tenés: ${c.url}` : ""}`;
 }
+
+// ── Pedidos por transferencia sin acreditar (para el mensaje automático) ──
+
+export type TnPendingTransfer = { id: number; number: number | null; phone: string | null; createdAt: string; gateway: string };
+
+/** Así aparece la transferencia en los pedidos: "Transferencia bancaria", "Depósito o transferencia", método "transfer"… */
+export function isTransferOrder(o: { gateway?: unknown; gateway_name?: unknown; payment_details?: { method?: unknown } | null }): boolean {
+  const text = [o.gateway_name, o.payment_details?.method, o.gateway].filter((x) => typeof x === "string").join(" ");
+  return /transfer|dep[oó]sito|cbu|alias|wire/i.test(text);
+}
+
+/**
+ * Pedidos creados en la ventana [desde, hasta] que siguen con el pago pendiente y son por transferencia.
+ * Sin caché: lo pide el reloj cada 5 minutos.
+ */
+export async function pendingTransferOrders(fromMs: number, toMs: number): Promise<{ ok: true; orders: TnPendingTransfer[] } | { ok: false; error: string } | null> {
+  if (!isConnected()) return null;
+  const orders: TnPendingTransfer[] = [];
+  try {
+    for (let page = 1; page <= 10; page++) {
+      const url = new URL(`${API}/${tiendanube.storeId}/orders`);
+      url.search = new URLSearchParams({
+        created_at_min: new Date(fromMs).toISOString(),
+        payment_status: "pending",
+        per_page: "200",
+        page: String(page),
+      }).toString();
+      const res = await fetch(url, { headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA }, cache: "no-store" });
+      if (res.status === 404) break;
+      if (!res.ok) return { ok: false, error: `Tiendanube respondió ${res.status}` };
+      const list = (await res.json()) as (TnOrder & { gateway?: string; gateway_name?: string; payment_details?: { method?: string } | null })[];
+      for (const o of list) {
+        const t = Date.parse(o.created_at ?? "");
+        if (!Number.isFinite(t) || t < fromMs || t > toMs) continue;
+        if (o.payment_status !== "pending" || o.status === "cancelled" || !isTransferOrder(o)) continue;
+        orders.push({
+          id: o.id,
+          number: o.number ?? null,
+          phone: normalizePhoneAR(o.contact_phone || o.customer?.phone || null),
+          createdAt: o.created_at ?? "",
+          gateway: o.gateway_name || o.payment_details?.method || o.gateway || "",
+        });
+      }
+      if (list.length < 200) break;
+    }
+  } catch {
+    return { ok: false, error: "No se pudo conectar con Tiendanube" };
+  }
+  return { ok: true, orders };
+}
