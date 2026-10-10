@@ -31,18 +31,37 @@ function Bar({ value, goal, status }: { value: number; goal: number | null; stat
   );
 }
 
+/** "Deberían llevar X a hoy" y la diferencia, en verde si van arriba y en rojo si van abajo. */
+function Behind({ text, diff, fmt }: { text: string; diff: number; fmt: (n: number) => string }) {
+  return (
+    <p className="text-xs text-stone-600">
+      {text} ·{" "}
+      {diff === 0 ? (
+        <b className="text-emerald-700">al día ✓</b>
+      ) : (
+        <b className={diff > 0 ? "text-emerald-700" : "text-rose-700"}>
+          {diff > 0 ? "+" : "−"}
+          {fmt(Math.abs(diff))}
+        </b>
+      )}
+    </p>
+  );
+}
+
 function Metric({
   label,
   value,
   goal,
   status,
   hint,
+  extra,
 }: {
   label: string;
   value: string;
   goal: string | null;
   status: PaceStatus | null;
   hint?: string;
+  extra?: React.ReactNode;
 }) {
   return (
     <div>
@@ -58,6 +77,7 @@ function Metric({
           "sin objetivo"
         )}
       </p>
+      {extra}
     </div>
   );
 }
@@ -79,6 +99,15 @@ function LineMetrics({ l, today, big = false }: { l: LocalLine; today: string; b
           goal={l.goalTotal ? formatMoney(Math.round(l.goalTotal)) : null}
           status={totalPace?.status ?? null}
           hint={pct(l.total, l.goalTotal)}
+          extra={
+            totalPace && (
+              <Behind
+                text={`a hoy ${big ? "deberían" : "debería"} llevar ${formatMoney(Math.round(totalPace.expected))}`}
+                diff={Math.round(l.total - totalPace.expected)}
+                fmt={(n) => formatMoney(n)}
+              />
+            )
+          }
         />
         <Bar value={l.total} goal={l.goalTotal} status={totalPace?.status ?? null} />
       </div>
@@ -89,6 +118,15 @@ function LineMetrics({ l, today, big = false }: { l: LocalLine; today: string; b
           goal={l.goalCount ? String(l.goalCount) : null}
           status={countPace?.status ?? null}
           hint={pct(l.ventas, l.goalCount)}
+          extra={
+            countPace && (
+              <Behind
+                text={`a hoy ${big ? "deberían" : "debería"} llevar ${Math.round(countPace.expected)}`}
+                diff={Math.round(l.ventas - countPace.expected)}
+                fmt={(n) => `${n} ${n === 1 ? "venta" : "ventas"}`}
+              />
+            )
+          }
         />
         <Bar value={l.ventas} goal={l.goalCount} status={countPace?.status ?? null} />
       </div>
@@ -99,6 +137,11 @@ function LineMetrics({ l, today, big = false }: { l: LocalLine; today: string; b
           goal={l.goalTicket ? formatMoney(Math.round(l.goalTicket)) : null}
           status={tk}
           hint={pct(l.avg, l.goalTicket)}
+          extra={
+            l.goalTicket && l.ventas > 0 ? (
+              <Behind text="contra el objetivo" diff={Math.round(l.avg - l.goalTicket)} fmt={(n) => `${formatMoney(n)} por venta`} />
+            ) : null
+          }
         />
         <Bar value={l.avg} goal={l.goalTicket} status={tk} />
       </div>

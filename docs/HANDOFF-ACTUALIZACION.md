@@ -848,3 +848,7 @@ El usuario quiere ver todos esos contactos en el tablero.
 - **Colores:** la facturación y las ventas usan el mismo ritmo diario que el objetivo general (`pace`). El ticket queda verde si llega, amarillo si está hasta 10% abajo y rojo si está más abajo.
 - **Menú:** "🏬 Locales" (en el celu, el 🏬 de arriba).
 - **Ojo:** después de una migración que crea funciones o tablas nuevas, correr `notify pgrst, 'reload schema'`. Con `save_store_snapshot` hizo falta: el RPC fallaba en silencio hasta recargar el esquema.
+- **Agregado (pedido "que marque cuánto abajo vienen en todo"):** en cada número de Locales (facturación, ventas y ticket), debajo del objetivo:
+  - en facturación y ventas, "a hoy deberían llevar X · ±diferencia", con lo esperado según `pace().expected`;
+  - en el ticket, "contra el objetivo · ±$ por venta";
+  - cuando la diferencia es 0, dice "al día ✓".
