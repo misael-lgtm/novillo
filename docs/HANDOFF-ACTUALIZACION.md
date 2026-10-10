@@ -838,3 +838,13 @@ El usuario quiere ver todos esos contactos en el tablero.
   - `getStoreSales(supabase, mes)` en `goals.ts` lee lo guardado si tiene menos de 15 minutos; si no, consulta Tiendanube como antes.
   - Lo usan la barra del objetivo y el festejo. Además las páginas cargan más rápido porque no esperan a Tiendanube.
 - El cron ahora tiene 60 s de timeout y la ruta `maxDuration = 60`.
+
+## 40. PR siguiente (10/10): pestaña Locales con objetivos de Palermo y Güemes
+
+- **Pedido:** pestaña "Locales" con el objetivo de Palermo y el de Güemes; abajo, los vendedores; mostrar facturación, cantidad de ventas y ticket promedio. El usuario carga cantidad de ventas y ticket promedio, y la facturación objetivo es ventas × ticket.
+- **Ventas:** las de Tiendanube con "local/Nombre/Palermo" o "local/Nombre/Güemes" en la nota (`localOf` / `LOCAL_MARK` en `tiendanube.ts`), pagadas en el mes y con total mayor a 0 (los cambios de $0 no cuentan). Van en `StoreSales.local` y en el snapshot del reloj.
+- **Vendedores:** `summarizeLocals` (`src/lib/locales.ts`) busca a la persona del equipo por prefijo común de 4 o más letras ("fabrico" → Fabricio, "misa" → Misael). Si no es del equipo, aparece con su nombre (ej. Luana) y la clave `nombre:<nombre>`.
+- **Objetivos:** tabla `local_goals` (migración `0021`, ya aplicada): `month`, `local`, `seller` ('' = el local entero) y `sales_count` / `avg_ticket`. Solo el admin escribe, con `saveLocalGoal` y el editor `LocalGoalEditor`, directo en `/locales`.
+- **Colores:** la facturación y las ventas usan el mismo ritmo diario que el objetivo general (`pace`). El ticket queda verde si llega, amarillo si está hasta 10% abajo y rojo si está más abajo.
+- **Menú:** "🏬 Locales" (en el celu, el 🏬 de arriba).
+- **Ojo:** después de una migración que crea funciones o tablas nuevas, correr `notify pgrst, 'reload schema'`. Con `save_store_snapshot` hizo falta: el RPC fallaba en silencio hasta recargar el esquema.
