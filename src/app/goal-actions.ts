@@ -2,9 +2,8 @@
 
 // Ventas off de Tiendanube del mes, para festejar en pantalla cuando entra una nueva.
 
-import { attributeStoreSales, monthStart } from "@/lib/goals";
+import { attributeStoreSales, getStoreSales, monthStart } from "@/lib/goals";
 import { getTeam, requireMember } from "@/lib/session";
-import { storeSalesForMonth } from "@/lib/tiendanube";
 import type { ActionResult } from "@/lib/types";
 
 export type OffSale = { id: number; total: number; seller: string | null; avatar: string | null };
@@ -13,7 +12,7 @@ export type OffSale = { id: number; total: number; seller: string | null; avatar
 export async function getOffSalesFeed(): Promise<{ month: string; sales: OffSale[] } | null> {
   const { supabase } = await requireMember();
   const month = monthStart();
-  const store = await storeSalesForMonth(month);
+  const store = await getStoreSales(supabase, month);
   if (!store?.ok) return null;
   const team = await getTeam();
   const { sellerOf } = await attributeStoreSales(supabase, team, store.off);

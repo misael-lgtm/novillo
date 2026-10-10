@@ -7,7 +7,7 @@ begin
     perform cron.schedule('auto-transferencias', '*/5 * * * *', $job$
       select net.http_get(
         url := 'https://wayfarer-crm.vercel.app/api/auto/transferencias?key=' || (select value from crm_private.secrets where name = 'cron'),
-        timeout_milliseconds := 30000
+        timeout_milliseconds := 60000
       )
     $job$);
   end if;
