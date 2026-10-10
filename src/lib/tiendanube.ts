@@ -439,6 +439,9 @@ export async function monthDiagnosis(month: string) {
     offNoPagadosOCancelados: [] as { n: number | null; total: number; estado: string }[],
     notaParecidaAOffQueNoCuenta: [] as { n: number | null; total: number; nota: string }[],
     sinOffEjemplos: [] as { n: number | null; total: number; origen: string; nota: string }[],
+    /** Pedidos por transferencia que siguen esperando el pago (de los últimos 30 días, sin cancelados). */
+    transferenciasSinConfirmar: { total: 0, ventas: 0 } as Tally,
+    transferenciasSinConfirmarLista: [] as { n: number | null; total: number; creado: string | null; off: boolean; local: string | null }[],
     envioCobradoEnOff: 0,
     descuentosEnOff: 0,
     leidos: 0,
@@ -457,6 +460,10 @@ export async function monthDiagnosis(month: string) {
       const text = noteText(o);
       const offName = text.match(OFF_MARK)?.[1] ?? null;
       const byPaid = inMonth(o.paid_at || o.created_at);
+      if (o.payment_status === "pending" && o.status !== "cancelled" && isTransferOrder(o as never) && Date.parse(o.created_at ?? "") >= Date.now() - 30 * 86400000) {
+        add(r.transferenciasSinConfirmar, total);
+        r.transferenciasSinConfirmarLista.push({ n: o.number ?? null, total, creado: o.created_at ?? null, off: !!offName, local: localOf(text)?.local ?? null });
+      }
       const byCreated = inMonth(o.created_at);
       if (paid && byPaid) add(r.pagadosPorFechaDePago, total);
       if (paid && byCreated) add(r.pagadosPorFechaDePedido, total);
