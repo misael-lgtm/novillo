@@ -391,3 +391,75 @@ export async function pendingTransferOrders(fromMs: number, toMs: number): Promi
   }
   return { ok: true, orders };
 }
+
+// ── Diagnóstico: de dónde sale la diferencia con las estadísticas de Tiendanube ──
+
+type Tally = { total: number; ventas: number };
+const add = (t: Tally, n: number) => {
+  t.total += n;
+  t.ventas += 1;
+};
+
+/** Resumen del mes para comparar con Tiendanube: por fecha de pago y de pedido, con y sin "off/", y los casos raros. */
+export async function monthDiagnosis(month: string) {
+  if (!isConnected()) return null;
+  const [y, m] = month.split("-").map(Number);
+  const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  const from = new Date(`${month}T00:00:00-03:00`).getTime();
+  const to = new Date(`${next}T00:00:00-03:00`).getTime();
+  const inMonth = (iso?: string | null) => {
+    const t = Date.parse(iso ?? "");
+    return Number.isFinite(t) && t >= from && t < to;
+  };
+  const r = {
+    pagadosPorFechaDePago: { total: 0, ventas: 0 } as Tally,
+    pagadosPorFechaDePedido: { total: 0, ventas: 0 } as Tally,
+    offQueCuentan: { total: 0, ventas: 0 } as Tally,
+    pagadosSinOff: { total: 0, ventas: 0 } as Tally,
+    pagadosSinOffPorOrigen: {} as Record<string, Tally>,
+    offPedidoDeEsteMesPagadoOtroMes: [] as { n: number | null; total: number; pago: string | null }[],
+    offPagadoEsteMesPedidoOtroMes: [] as { n: number | null; total: number; pedido: string | null }[],
+    offNoPagadosOCancelados: [] as { n: number | null; total: number; estado: string }[],
+    notaParecidaAOffQueNoCuenta: [] as { n: number | null; total: number; nota: string }[],
+    sinOffEjemplos: [] as { n: number | null; total: number; origen: string; nota: string }[],
+    envioCobradoEnOff: 0,
+    descuentosEnOff: 0,
+    leidos: 0,
+  };
+  for (let page = 1; page <= 100; page++) {
+    const url = new URL(`${API}/${tiendanube.storeId}/orders`);
+    url.search = new URLSearchParams({ updated_at_min: new Date(from - 31 * 86400000).toISOString(), status: "any", per_page: "200", page: String(page) }).toString();
+    const res = await fetch(url, { headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA }, cache: "no-store" });
+    if (res.status === 404) break;
+    if (!res.ok) return { error: `Tiendanube respondió ${res.status}` };
+    const orders = (await res.json()) as (TnOrder & { shipping_cost_customer?: string; discount?: string })[];
+    r.leidos += orders.length;
+    for (const o of orders) {
+      const total = Number(o.total) || 0;
+      const paid = o.payment_status === "paid" && o.status !== "cancelled";
+      const text = noteText(o);
+      const offName = text.match(OFF_MARK)?.[1] ?? null;
+      const byPaid = inMonth(o.paid_at || o.created_at);
+      const byCreated = inMonth(o.created_at);
+      if (paid && byPaid) add(r.pagadosPorFechaDePago, total);
+      if (paid && byCreated) add(r.pagadosPorFechaDePedido, total);
+      if (offName) {
+        if (paid && byPaid) {
+          add(r.offQueCuentan, total);
+          r.envioCobradoEnOff += Number(o.shipping_cost_customer) || 0;
+          r.descuentosEnOff += Number(o.discount) || 0;
+        }
+        if (paid && byCreated && !byPaid) r.offPedidoDeEsteMesPagadoOtroMes.push({ n: o.number ?? null, total, pago: o.paid_at ?? null });
+        if (paid && byPaid && !byCreated) r.offPagadoEsteMesPedidoOtroMes.push({ n: o.number ?? null, total, pedido: o.created_at ?? null });
+        if (!paid && (byCreated || byPaid)) r.offNoPagadosOCancelados.push({ n: o.number ?? null, total, estado: `${o.status}/${o.payment_status}` });
+      } else if (paid && byPaid) {
+        add(r.pagadosSinOff, total);
+        add((r.pagadosSinOffPorOrigen[o.storefront || "?"] ??= { total: 0, ventas: 0 }), total);
+        if (/\bof+\b|0ff|off\s|\boff$/i.test(text)) r.notaParecidaAOffQueNoCuenta.push({ n: o.number ?? null, total, nota: text.slice(0, 80) });
+        else if (r.sinOffEjemplos.length < 40) r.sinOffEjemplos.push({ n: o.number ?? null, total, origen: o.storefront || "?", nota: text.slice(0, 60) });
+      }
+    }
+    if (orders.length < 200) break;
+  }
+  return r;
+}
