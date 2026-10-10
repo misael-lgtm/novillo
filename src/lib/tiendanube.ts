@@ -361,7 +361,16 @@ export function cartMessage(c: TnCart, seller: string): string {
 
 // ── Pedidos por transferencia sin acreditar (para el mensaje automático) ──
 
-export type TnPendingTransfer = { id: number; number: number | null; phone: string | null; createdAt: string; gateway: string };
+export type TnPendingTransfer = {
+  id: number;
+  number: number | null;
+  phone: string | null;
+  createdAt: string;
+  gateway: string;
+  total: number;
+  off: string | null;
+  local: "palermo" | "guemes" | null;
+};
 
 /** Así aparece la transferencia en los pedidos: "Transferencia bancaria", "Depósito o transferencia", método "transfer"… */
 export function isTransferOrder(o: { gateway?: unknown; gateway_name?: unknown; payment_details?: { method?: unknown } | null }): boolean {
@@ -399,6 +408,9 @@ export async function pendingTransferOrders(fromMs: number, toMs: number): Promi
           phone: normalizePhoneAR(o.contact_phone || o.customer?.phone || null),
           createdAt: o.created_at ?? "",
           gateway: o.gateway_name || o.payment_details?.method || o.gateway || "",
+          total: Number(o.total) || 0,
+          off: noteText(o).match(OFF_MARK)?.[1] ?? null,
+          local: localOf(noteText(o))?.local ?? null,
         });
       }
       if (list.length < 200) break;
