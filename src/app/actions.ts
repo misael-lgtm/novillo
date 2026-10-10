@@ -841,3 +841,25 @@ export async function createCartOrder(cartId: number): Promise<ActionResult<{ id
   refresh();
   return { ok: true, data, message: `Tarjeta #${data.number} creada en Interesado ✔` };
 }
+
+/** Objetivo de un local (seller '') o de un vendedor en el local: cantidad de ventas y ticket promedio. Vacíos = sacarlo. Solo admin. */
+export async function saveLocalGoal(input: { month: string; local: string; seller: string; salesCount: string; avgTicket: string }): Promise<ActionResult> {
+  const { supabase, me } = await requireMember();
+  if (!me.is_admin) return { ok: false, error: "Solo el admin carga objetivos." };
+  if (!/^\d{4}-\d{2}-01$/.test(input.month)) return { ok: false, error: "Mes inválido." };
+  if (!["palermo", "guemes"].includes(input.local)) return { ok: false, error: "Local inválido." };
+  const count = input.salesCount.trim() ? Number(input.salesCount.replace(/\D/g, "")) : null;
+  const ticket = input.avgTicket.trim() ? parseMoney(input.avgTicket) : null;
+  if (count !== null && !(count > 0)) return { ok: false, error: "La cantidad de ventas tiene que ser un número." };
+  if (input.avgTicket.trim() && !(ticket && ticket > 0)) return { ok: false, error: "El ticket promedio tiene que ser un monto. Ej: 85.000" };
+  const key = { month: input.month, local: input.local, seller: input.seller.slice(0, 120) };
+  const { error } =
+    count === null && ticket === null
+      ? await supabase.from("local_goals").delete().match(key)
+      : await supabase
+          .from("local_goals")
+          .upsert({ ...key, sales_count: count, avg_ticket: ticket, updated_by: me.email, updated_at: new Date().toISOString() }, { onConflict: "month,local,seller" });
+  if (error) return { ok: false, error: "No se pudo guardar." };
+  revalidatePath("/locales");
+  return { ok: true };
+}

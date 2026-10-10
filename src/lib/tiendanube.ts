@@ -34,6 +34,16 @@ export type TnSale = {
 /** Así marcan los chicos sus ventas en Tiendanube: "OFF/Mariano", "OFF / Fabricio", "off-Bruno"… */
 const OFF_MARK = /\bOFF\s*[\/|\-]\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)/i;
 
+/** Venta de un local: en la nota dicen "local/Fabricio/Guemes/point mp". */
+export type TnLocalSale = { id: number; number: number | null; total: number; local: "palermo" | "guemes"; seller: string | null; date: string };
+const LOCAL_MARK = /\blocal\s*\/\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)\s*\/\s*(palermo|g[uü]emes)/i;
+/** De la nota de un pedido: el local y el vendedor ("local/fabricio/guemes" → guemes, Fabricio). */
+export function localOf(note: string): { local: "palermo" | "guemes"; seller: string } | null {
+  const m = note.match(LOCAL_MARK);
+  if (!m) return null;
+  return { local: /palermo/i.test(m[2]) ? "palermo" : "guemes", seller: m[1] };
+}
+
 /** Fila para revisar en /tiendanube: cada pedido off (o casi) y si cuenta o por qué no. */
 export type TnCheck = {
   id: number;
@@ -51,6 +61,8 @@ export type StoreSales =
       ok: true;
       /** Solo las ventas off que cuentan para los objetivos. */
       off: TnSale[];
+      /** Ventas de los locales ("local/Nombre/Palermo"), pagadas en el mes. */
+      local?: TnLocalSale[];
       /** Todos los pedidos pagados del mes por origen, para revisar qué se cuenta y qué no. */
       byOrigin: Record<string, { total: number; ventas: number }>;
       /** Pedidos con "OFF/" o de origen manual (cuenten o no), para revisar. */
@@ -116,6 +128,7 @@ export async function storeSalesForMonth(month: string, { fresh = false }: { fre
   const to = new Date(`${next}T00:00:00-03:00`).getTime();
 
   const off: TnSale[] = [];
+  const local: TnLocalSale[] = [];
   const checks: TnCheck[] = [];
   const byOrigin: Record<string, { total: number; ventas: number }> = {};
   let read = 0;
@@ -156,6 +169,9 @@ export async function storeSalesForMonth(month: string, { fresh = false }: { fre
           const b = (byOrigin[origin] ??= { total: 0, ventas: 0 });
           b.total += total;
           b.ventas += 1;
+          const loc = localOf(text);
+          // Los cambios sin diferencia ($0) no son ventas.
+          if (loc && !isOff && total > 0) local.push({ id: o.id, number: o.number ?? null, total, local: loc.local, seller: loc.seller, date });
         }
         if (!isOff && !manual) continue;
         const reason = !isOff
@@ -184,7 +200,7 @@ export async function storeSalesForMonth(month: string, { fresh = false }: { fre
     return { ok: false, error: "No se pudo conectar con Tiendanube" };
   }
   checks.sort((a, b) => b.date.localeCompare(a.date));
-  return { ok: true, off, byOrigin, checks, read };
+  return { ok: true, off, local, byOrigin, checks, read };
 }
 
 export type TnCustomer = {
