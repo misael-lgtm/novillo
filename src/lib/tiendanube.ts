@@ -108,7 +108,7 @@ const PAYMENT_LABELS: Record<string, string> = {
  * Pide los pedidos actualizados desde el día 1, así entran los creados antes pero cobrados este mes.
  * null si no está conectada.
  */
-export async function storeSalesForMonth(month: string): Promise<StoreSales | null> {
+export async function storeSalesForMonth(month: string, { fresh = false }: { fresh?: boolean } = {}): Promise<StoreSales | null> {
   if (!isConnected()) return null;
   const [y, m] = month.split("-").map(Number);
   const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
@@ -131,7 +131,8 @@ export async function storeSalesForMonth(month: string): Promise<StoreSales | nu
       const res = await fetch(url, {
         headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA },
         // Se vuelve a pedir a lo sumo cada 2 minutos (lo comparten todos los que tienen el CRM abierto).
-        next: { revalidate: Number(process.env.TIENDANUBE_REVALIDATE_SECONDS) || 120 },
+        // fresh: el reloj, que guarda el resultado en la base (sin caché, siempre lo último).
+        ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: Number(process.env.TIENDANUBE_REVALIDATE_SECONDS) || 120 } }),
       });
       // Tiendanube devuelve 404 cuando la página ya no tiene pedidos.
       if (res.status === 404) break;

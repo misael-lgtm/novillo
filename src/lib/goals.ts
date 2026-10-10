@@ -1,9 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { todayAR } from "./rules";
-import { storeSalesForMonth, type TnSale } from "./tiendanube";
+import { storeSalesForMonth, type StoreSales, type TnSale } from "./tiendanube";
 import type { TeamMember } from "./types";
 
 export const TEAM_SCOPE = "equipo";
+
+/**
+ * Ventas del mes de la tienda: las que guardó el reloj en la base (cada 5 min) si son de hace menos de 15 minutos;
+ * si no hay (o el reloj se frenó), se le pregunta a Tiendanube.
+ */
+export async function getStoreSales(supabase: SupabaseClient, month: string): Promise<StoreSales | null> {
+  const { data } = await supabase.from("store_sales_snapshot").select("data, updated_at").eq("month", month).maybeSingle();
+  if (data && Date.now() - Date.parse(data.updated_at as string) < 15 * 60_000) return data.data as StoreSales;
+  return storeSalesForMonth(month);
+}
 
 /** "2026-10-05" → "2026-10-01" (mes en hora argentina). */
 export function monthStart(isoDate = todayAR()): string {
@@ -55,7 +65,7 @@ export async function getGoalSummary(supabase: SupabaseClient, team: TeamMember[
   const [{ data: goals }, { data: salesData }, store] = await Promise.all([
     supabase.from("monthly_goals").select("scope, amount").eq("month", month).returns<{ scope: string; amount: number }[]>(),
     supabase.rpc("month_sales", { p_month: month }),
-    storeSalesForMonth(month),
+    getStoreSales(supabase, month),
   ]);
   const crmSales = (salesData ?? []) as { member: string; total: number; ventas: number }[];
   const goalOf = new Map((goals ?? []).map((g) => [g.scope, Number(g.amount)]));

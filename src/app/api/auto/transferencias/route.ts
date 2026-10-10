@@ -2,15 +2,22 @@
 import { createClient } from "@supabase/supabase-js";
 import { AUTO_TRANSFER } from "@/lib/config";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/env";
-import { pendingTransferOrders } from "@/lib/tiendanube";
+import { monthStart } from "@/lib/goals";
+import { pendingTransferOrders, storeSalesForMonth } from "@/lib/tiendanube";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET(req: Request) {
   const key = new URL(req.url).searchParams.get("key") ?? "";
   const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
   const { data: valid } = await db.rpc("auto_check_key", { p_key: key });
   if (!valid) return Response.json({ error: "clave inválida" }, { status: 401 });
+
+  // De paso, guardar las ventas del mes frescas para el objetivo (el CRM las lee de la base).
+  const month = monthStart();
+  const sales = await storeSalesForMonth(month, { fresh: true });
+  if (sales?.ok) await db.rpc("save_store_snapshot", { p_key: key, p_month: month, p_data: sales });
 
   const now = Date.now();
   const res = await pendingTransferOrders(now - AUTO_TRANSFER.untilMinutes * 60_000, now - AUTO_TRANSFER.afterMinutes * 60_000);

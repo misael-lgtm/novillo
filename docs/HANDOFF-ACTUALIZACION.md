@@ -829,3 +829,12 @@ El usuario quiere ver todos esos contactos en el tablero.
 - **En el chat:** los mensajes automáticos llevan un 🤖 al lado de la hora.
 - **Probado** con una Tiendanube de prueba: manda solo los pedidos por transferencia pendientes de entre 30 min y 3 h, no repite, y rechaza la clave equivocada.
 - **No probado:** contra la Tiendanube real, por cómo nombra el medio de pago. Si no detecta los pedidos, revisar qué devuelve `/api/auto/transferencias` (`pendientes`).
+
+## 39. PR siguiente (10/10): el objetivo lee las ventas guardadas en la base
+
+- **Pedido:** "sigo viendo sin actualizar el CRM". El CRM mostraba $10.535.419 y Tiendanube $11.020.263. El diagnóstico (`/api/auto/diagnostico`, la ruta con la clave del reloj) confirmó que las ventas off reales eran exactamente $11.020.262,68, así que el CRM estaba mostrando un dato viejo de la caché de fetch.
+- **Arreglo:** `store_sales_snapshot` (migración `0020`, ya aplicada).
+  - El reloj (`/api/auto/transferencias`, cada 5 min) llama además a `storeSalesForMonth(mes, { fresh: true })`, sin caché, y lo guarda con `save_store_snapshot(key, …)`.
+  - `getStoreSales(supabase, mes)` en `goals.ts` lee lo guardado si tiene menos de 15 minutos; si no, consulta Tiendanube como antes.
+  - Lo usan la barra del objetivo y el festejo. Además las páginas cargan más rápido porque no esperan a Tiendanube.
+- El cron ahora tiene 60 s de timeout y la ruta `maxDuration = 60`.
