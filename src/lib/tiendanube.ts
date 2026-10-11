@@ -98,7 +98,7 @@ type TnOrder = {
   paid_at?: string | null;
   contact_phone?: string | null;
   contact_email?: string | null;
-  customer?: { phone?: string | null; email?: string | null } | null;
+  customer?: { name?: string | null; phone?: string | null; email?: string | null } | null;
   [k: string]: unknown;
 };
 
@@ -367,6 +367,7 @@ export type TnPendingTransfer = {
   phone: string | null;
   createdAt: string;
   gateway: string;
+  name: string | null;
   total: number;
   off: string | null;
   local: "palermo" | "guemes" | null;
@@ -408,6 +409,7 @@ export async function pendingTransferOrders(fromMs: number, toMs: number): Promi
           phone: normalizePhoneAR(o.contact_phone || o.customer?.phone || null),
           createdAt: o.created_at ?? "",
           gateway: o.gateway_name || o.payment_details?.method || o.gateway || "",
+          name: o.customer?.name || null,
           total: Number(o.total) || 0,
           off: noteText(o).match(OFF_MARK)?.[1] ?? null,
           local: localOf(noteText(o))?.local ?? null,

@@ -60,8 +60,17 @@ export function Nav({ name, isAdmin, shared }: { name: string; isAdmin: boolean;
             >
               🏬 Locales
             </Link>
+            <Link
+              href="/transferencias"
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${active("/transferencias") ? "bg-stone-900 text-white" : "hover:bg-stone-100"}`}
+            >
+              🏦 Transferencias
+            </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <Link href="/transferencias" className="text-lg md:hidden" aria-label="Transferencias sin confirmar" title="Transferencias sin confirmar">
+              🏦
+            </Link>
             <Link href="/locales" className="text-lg md:hidden" aria-label="Locales" title="Locales">
               🏬
             </Link>
