@@ -354,9 +354,17 @@ export function cartSummary(c: TnCart): string {
 }
 
 /** Mensaje para escribirle por WhatsApp a alguien que dejó el carrito. */
-export function cartMessage(c: TnCart, seller: string): string {
-  const first = (c.name ?? "").split(" ")[0];
-  return `Hola${first ? ` ${first}` : ""}! Te habla ${seller} de Wayfarer 🤙 Vimos que te quedó en el carrito ${cartSummary(c)}. ¿Te ayudo a terminar la compra?${c.url ? ` Acá lo tenés: ${c.url}` : ""}`;
+export const CART_MESSAGE = `Hola! Cómo estás? Te habla Fabri, de Wayfarer.
+
+Vimos que tenes un carrito armado y no pudiste finalizar tu compra. Queríamos verificar si vas a completarla; de lo contrario, tendremos que liberar el producto que quedó reservado en la orden.
+
+Por otro lado, si la finalizas dentro de las próximas 3 horas, ¡te puedo aplicar un 5% OFF adicional!
+
+¡Avisame si te interesa!`;
+
+/** Mensaje para escribirle a alguien que dejó el carrito (el mismo texto que la respuesta rápida /carrito). */
+export function cartMessage(): string {
+  return CART_MESSAGE;
 }
 
 // ── Pedidos por transferencia sin acreditar (para el mensaje automático) ──
