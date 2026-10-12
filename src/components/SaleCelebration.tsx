@@ -5,7 +5,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getCelebrationImage, type OffSale } from "@/app/goal-actions";
+import { getCelebrationAudio, getCelebrationImage, type OffSale } from "@/app/goal-actions";
 import { formatMoney } from "@/lib/rules";
 
 const POLL_MS = 60_000;
@@ -35,6 +35,8 @@ export function SaleCelebration() {
   const router = useRouter();
   const [party, setParty] = useState<Party | null>(null);
   const image = useRef<string | null | undefined>(undefined);
+  const audioSrc = useRef<string | null | undefined>(undefined);
+  const player = useRef<HTMLAudioElement | null>(null);
   const seenMem = useRef<Seen | null>(null);
 
   const check = useCallback(async () => {
@@ -53,6 +55,13 @@ export function SaleCelebration() {
     const fresh = feed.sales.filter((s) => !seen.ids.includes(s.id));
     if (!fresh.length) return;
     if (image.current === undefined) image.current = await getCelebrationImage().catch(() => null);
+    if (audioSrc.current === undefined) audioSrc.current = await getCelebrationAudio().catch(() => null);
+    if (audioSrc.current) {
+      player.current?.pause();
+      player.current = new Audio(audioSrc.current);
+      // Si el navegador no deja sonar (nadie tocó la página todavía), festeja sin sonido.
+      player.current.play().catch(() => {});
+    }
     const biggest = fresh.reduce((a, b) => (b.total > a.total ? b : a));
     setParty({ key: Date.now(), sale: biggest, more: fresh.length - 1 });
     router.refresh(); // que la barra del objetivo sume la venta
@@ -71,7 +80,11 @@ export function SaleCelebration() {
   }, [party]);
 
   if (!party) return null;
-  return <Confetti key={party.key} party={party} image={image.current ?? null} onClose={() => setParty(null)} />;
+  const close = () => {
+    player.current?.pause();
+    setParty(null);
+  };
+  return <Confetti key={party.key} party={party} image={image.current ?? null} onClose={close} />;
 }
 
 function Confetti({ party, image, onClose }: { party: Party; image: string | null; onClose: () => void }) {
