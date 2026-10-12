@@ -517,7 +517,20 @@ export async function inventoryProbe(): Promise<unknown> {
     const res = await fetch(`${API}/${tiendanube.storeId}/${path}`, { headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA }, cache: "no-store" });
     return { status: res.status, body: res.ok ? await res.json() : (await res.text()).slice(0, 300) };
   };
-  const [locations, products] = await Promise.all([get("locations"), get("products?per_page=2&published=true")]);
+  const [locations, products, orders] = await Promise.all([get("locations"), get("products?per_page=2&published=true"), get("orders?per_page=50")]);
+  // Los nombres de los depósitos también vienen en los pedidos (dónde se preparó cada uno).
+  const names: Record<string, unknown> = {};
+  const walk = (x: unknown) => {
+    if (!x || typeof x !== "object") return;
+    if (Array.isArray(x)) return x.forEach(walk);
+    const o = x as Record<string, unknown>;
+    if (typeof o.location_id === "string" && (o.name || o.location_name)) names[o.location_id] = o.name ?? o.location_name;
+    if (typeof o.id === "string" && /^01[A-Z0-9]{24}$/.test(o.id) && o.name) names[o.id] = o.name;
+    Object.values(o).forEach(walk);
+  };
+  walk(orders.body);
+  const keys = Array.isArray(orders.body) && orders.body[0] ? Object.keys(orders.body[0] as object) : [];
+  const fulfillmentSample = Array.isArray(orders.body) ? (orders.body as Record<string, unknown>[]).map((o) => o.fulfillments ?? o.location_id).find((f) => f) : null;
   const sample = Array.isArray(products.body)
     ? (products.body as { name?: unknown; images?: { src?: string }[]; variants?: Record<string, unknown>[] }[]).map((p) => ({
         name: p.name,
@@ -525,5 +538,5 @@ export async function inventoryProbe(): Promise<unknown> {
         variants: (p.variants ?? []).slice(0, 3).map((v) => ({ values: v.values, stock: v.stock, inventory_levels: v.inventory_levels, image_id: v.image_id })),
       }))
     : products.body;
-  return { locations, productsStatus: products.status, sample };
+  return { locations, names, orderKeys: keys, fulfillmentSample, productsStatus: products.status, sample };
 }
