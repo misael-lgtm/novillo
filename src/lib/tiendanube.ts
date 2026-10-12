@@ -509,3 +509,21 @@ export async function monthDiagnosis(month: string) {
   }
   return r;
 }
+
+/** Para ver cómo están cargados los depósitos y el stock por depósito (solo diagnóstico). */
+export async function inventoryProbe(): Promise<unknown> {
+  if (!isConnected()) return null;
+  const get = async (path: string) => {
+    const res = await fetch(`${API}/${tiendanube.storeId}/${path}`, { headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA }, cache: "no-store" });
+    return { status: res.status, body: res.ok ? await res.json() : (await res.text()).slice(0, 300) };
+  };
+  const [locations, products] = await Promise.all([get("locations"), get("products?per_page=2&published=true")]);
+  const sample = Array.isArray(products.body)
+    ? (products.body as { name?: unknown; images?: { src?: string }[]; variants?: Record<string, unknown>[] }[]).map((p) => ({
+        name: p.name,
+        image: p.images?.[0]?.src,
+        variants: (p.variants ?? []).slice(0, 3).map((v) => ({ values: v.values, stock: v.stock, inventory_levels: v.inventory_levels, image_id: v.image_id })),
+      }))
+    : products.body;
+  return { locations, productsStatus: products.status, sample };
+}
