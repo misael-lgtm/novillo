@@ -369,7 +369,7 @@ export function WaInbox({
         )}
         <AdCounter line={line} />
       </div>
-      <div className="card grid h-[calc(100dvh-22rem)] min-h-[28rem] grid-cols-1 overflow-hidden shadow-sm md:grid-cols-[22rem_1fr]">
+      <div className="card grid h-[calc(100dvh-22rem)] min-h-[28rem] grid-cols-1 overflow-hidden shadow-sm md:grid-cols-[22rem_minmax(0,1fr)]">
         <aside className={`flex min-h-0 flex-col border-stone-200 md:border-r ${open ? "hidden md:flex" : "flex"}`}>
           <div className="space-y-2.5 border-b border-stone-200 p-3">
             <div className="flex items-center gap-2">
@@ -496,7 +496,7 @@ export function WaInbox({
             {!chats.length && <li className="p-8 text-center text-sm text-stone-500">{filter === UNREAD_FILTER ? "No hay chats sin leer 🎉" : q || filter ? "No hay chats con eso." : "Todavía no hay chats."}</li>}
           </ul>
         </aside>
-        <section className={`min-h-0 flex-col ${open ? "flex" : "hidden md:flex"}`}>
+        <section className={`min-h-0 min-w-0 flex-col ${open ? "flex" : "hidden md:flex"}`}>
           {open ? (
             <Conversation
               key={open.jid}
@@ -577,7 +577,12 @@ function Conversation({
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [labelsOpen, setLabelsOpen] = useState(false);
-  const bottom = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  // Bajar solo la lista de mensajes (scrollIntoView movía también la pantalla y dejaba el chat corrido de costado).
+  const toBottom = () => {
+    const el = scroller.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
   const fileInput = useRef<HTMLInputElement>(null);
   const textArea = useRef<HTMLTextAreaElement>(null);
   const [picker, setPicker] = useState<PickerTab | null>(null);
@@ -646,7 +651,7 @@ function Conversation({
     askHistory();
   }, [loaded, msgs.length, askedHistory, askHistory, line, chat.jid]);
   useEffect(() => {
-    if (msgs.length !== lastCount.current) bottom.current?.scrollIntoView({ block: "end" });
+    if (msgs.length !== lastCount.current) toBottom();
     lastCount.current = msgs.length;
   }, [msgs]);
 
@@ -817,7 +822,8 @@ function Conversation({
         )}
       </header>
       <div
-        className="wa-messages min-h-0 flex-1 overflow-y-auto bg-stone-100 px-3 py-4 md:px-8"
+        ref={scroller}
+        className="wa-messages min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-stone-100 px-3 py-4 md:px-8"
         style={{ backgroundImage: "radial-gradient(var(--color-stone-200, #e7e5e4) 1px, transparent 1px)", backgroundSize: "18px 18px" }}
         onScroll={(e) => {
           const el = e.currentTarget;
@@ -859,7 +865,7 @@ function Conversation({
                     m.media_path ? "p-1" : "px-3 py-1.5"
                   }`}
                 >
-                  {m.media_path && <MediaView m={m} onLoad={() => atBottom.current && bottom.current?.scrollIntoView({ block: "end" })} />}
+                  {m.media_path && <MediaView m={m} onLoad={() => atBottom.current && toBottom()} />}
                   <span className={m.media_path ? (text ? "block px-2 pb-1 pt-1.5" : "") : ""}>
                     {text}
                     {/* Hueco para que la hora no pise el texto */}
@@ -896,7 +902,7 @@ function Conversation({
         {loaded && !msgs.length && (
           <p className="mx-auto mt-6 w-fit rounded-full bg-white/90 px-4 py-1.5 text-center text-sm text-stone-500 shadow-sm">Sin mensajes todavía.</p>
         )}
-        <div ref={bottom} />
+
       </div>
       <form
         onSubmit={(e) => {
