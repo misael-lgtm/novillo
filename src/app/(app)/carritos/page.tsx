@@ -18,7 +18,7 @@ function ago(iso: string) {
 
 /** Carritos que quedaron sin pagar en Tiendanube, para escribirles desde el Teléfono Carritos o pasarlos al tablero. */
 export default async function CarritosPage({ searchParams }: { searchParams: Promise<{ q?: string; dias?: string }> }) {
-  const { supabase, me } = await requireMember();
+  const { supabase } = await requireMember();
   const { q = "", dias } = await searchParams;
   const days = [3, 7, 30].includes(Number(dias)) ? Number(dias) : 30;
   const res = await abandonedCarts(30);
@@ -78,7 +78,6 @@ export default async function CarritosPage({ searchParams }: { searchParams: Pro
   const chatOf = new Map((chats.data ?? []).map((c) => [c.phone as string, c as { last_at: string | null; last_message: string | null }]));
 
   const total = carts.reduce((s, c) => s + c.total, 0);
-  const firstName = me.name.split(" ")[0];
 
   return (
     <div className="space-y-4">
@@ -107,7 +106,7 @@ export default async function CarritosPage({ searchParams }: { searchParams: Pro
           const customer = customers.find((x) => (c.phone && x.phone === c.phone) || (c.email && x.email === c.email));
           const order = customer ? (openOrders ?? []).find((o) => o.customer_id === customer.id) : undefined;
           const chat = c.phone ? chatOf.get(c.phone) : undefined;
-          const message = cartMessage(c, firstName);
+          const message = cartMessage();
           return (
             <li key={c.id} className="card flex flex-col gap-3 p-4">
               <div className="flex items-start justify-between gap-2">
