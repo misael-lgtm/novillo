@@ -247,6 +247,28 @@ export async function setWaChatLabel(line: string, jid: string, labelId: string,
   return { ok: true };
 }
 
+/** ¿Está bloqueado ese chat? (pendiente = el conector todavía no lo aplicó en el teléfono). */
+export async function getWaBlocked(line: string, jid: string): Promise<{ blocked: boolean; pending: boolean }> {
+  if (!validLine(line) || !validJid(jid)) return { blocked: false, pending: false };
+  const { supabase } = await requireMember();
+  const [{ data: b }, { data: op }] = await Promise.all([
+    supabase.from("wa_blocked").select("jid").eq("line", line).eq("jid", jid).maybeSingle(),
+    supabase.from("wa_block_ops").select("op").eq("line", line).eq("jid", jid).is("done_at", null).is("error", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (op) return { blocked: op.op === "bloquear", pending: true };
+  return { blocked: !!b, pending: false };
+}
+
+/** Bloquear o desbloquear a alguien en ese teléfono (el conector lo aplica en WhatsApp). */
+export async function setWaBlocked(line: string, jid: string, block: boolean): Promise<ActionResult> {
+  if (!validLine(line)) return { ok: false, error: "Teléfono inválido." };
+  if (!validJid(jid)) return { ok: false, error: "Chat inválido." };
+  const { supabase, me } = await requireMember();
+  const { error } = await supabase.from("wa_block_ops").insert({ line, jid, op: block ? "bloquear" : "desbloquear", created_by: me.email });
+  if (error) return { ok: false, error: "No se pudo. Probá de nuevo." };
+  return { ok: true };
+}
+
 /** Escribirle a un número que todavía no tiene chat (ej. desde la ficha del cliente). Devuelve el chat. */
 export async function startWaChat(line: string, phone: string, body: string): Promise<ActionResult<{ jid: string }>> {
   const digits = phone.replace(/\D/g, "");

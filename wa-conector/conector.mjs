@@ -281,6 +281,22 @@ async function saveLabelAssociation(line, { association, type }) {
  * Una sola vez por teléfono: pedirle a WhatsApp todo de nuevo (etiquetas, contactos) porque las versiones
  * anteriores del conector no lo guardaban. Queda una marca en la carpeta de la sesión para no repetirlo.
  */
+/** Los números bloqueados en ese teléfono, para que el CRM los muestre. */
+async function syncBlocklist(line, sock) {
+  const list = (await sock.fetchBlocklist()) ?? [];
+  const jids = [];
+  for (const raw of list) {
+    let jid = normalizeJid(raw);
+    if (jid.endsWith("@lid")) {
+      const pn = await sock.signalRepository?.lidMapping?.getPNForLID(jid).catch(() => null);
+      if (pn) jid = normalizeJid(pn);
+    }
+    jids.push(jid);
+  }
+  await db.from("wa_blocked").delete().eq("line", line);
+  if (jids.length) await db.from("wa_blocked").upsert([...new Set(jids)].map((jid) => ({ line, jid })), { onConflict: "line,jid" });
+}
+
 async function fullResyncOnce(line, sock, keys) {
   // "-2": la primera vez no se guardaban qué chat tenía cada etiqueta, así que se pide todo de nuevo.
   const mark = join(SESSIONS, line, "crm-resync-2");
@@ -331,6 +347,7 @@ async function startLine(line) {
         if (sockets.get(line) !== sock) return;
         await fullResyncOnce(line, sock, state.keys);
         await fillMissingPhones(line).catch((e) => log(line, e.message));
+        await syncBlocklist(line, sock).catch((e) => log(line, "no se pudo leer los bloqueados:", e.message));
       }, 20000);
     }
     if (connection === "close") {
@@ -391,6 +408,7 @@ async function startLine(line) {
     const phone = phoneOf(normalizeJid(pn));
     if (lid && phone) await db.from("wa_chats").update({ phone }).eq("line", line).eq("jid", normalizeJid(lid)).is("phone", null);
   });
+  sock.ev.on("blocklist.update", () => syncBlocklist(line, sock).catch((e) => log(line, e.message)));
   sock.ev.on("labels.edit", (l) => saveLabel(line, l).catch((e) => log(line, e.message)));
   sock.ev.on("labels.association", (a) => saveLabelAssociation(line, a).catch((e) => log(line, e.message)));
 }
@@ -503,6 +521,33 @@ async function tick() {
         log(o.line, "no se pudo cambiar la etiqueta:", e.message);
         await db
           .from("wa_label_ops")
+          .update({ error: String(e.message).slice(0, 300) })
+          .eq("id", o.id);
+      }
+    }
+
+    // Bloquear o desbloquear desde el CRM
+    const { data: blocks } = await db
+      .from("wa_block_ops")
+      .select("id, line, jid, op")
+      .is("done_at", null)
+      .is("error", null)
+      .in("line", LINES)
+      .order("created_at")
+      .limit(20);
+    for (const o of blocks ?? []) {
+      const sock = sockets.get(o.line);
+      if (!sock?.user) continue;
+      try {
+        await sock.updateBlockStatus(o.jid, o.op === "bloquear" ? "block" : "unblock");
+        if (o.op === "bloquear") await db.from("wa_blocked").upsert({ line: o.line, jid: o.jid }, { onConflict: "line,jid" });
+        else await db.from("wa_blocked").delete().match({ line: o.line, jid: o.jid });
+        await db.from("wa_block_ops").update({ done_at: new Date().toISOString() }).eq("id", o.id);
+        log(o.line, o.op === "bloquear" ? "bloqueado" : "desbloqueado", o.jid.split("@")[0]);
+      } catch (e) {
+        log(o.line, "no se pudo bloquear/desbloquear:", e.message);
+        await db
+          .from("wa_block_ops")
           .update({ error: String(e.message).slice(0, 300) })
           .eq("id", o.id);
       }
