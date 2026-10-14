@@ -852,3 +852,11 @@ El usuario quiere ver todos esos contactos en el tablero.
   - en facturación y ventas, "a hoy deberían llevar X · ±diferencia", con lo esperado según `pace().expected`;
   - en el ticket, "contra el objetivo · ±$ por venta";
   - cuando la diferencia es 0, dice "al día ✓".
+
+## §41 Bloquear gente desde el CRM
+
+- Migración `0025_bloqueos`: `wa_blocked` (lista de bloqueados por teléfono, la mantiene el conector) y `wa_block_ops` (pedidos de bloquear/desbloquear desde el CRM).
+- Conector: aplica `wa_block_ops` con `sock.updateBlockStatus`, y al conectarse (y con `blocklist.update`) baja la lista con `fetchBlocklist()` (los @lid se pasan a número si se conoce).
+- CRM: botón "🚫 Bloquear" / "Desbloquear" en el encabezado del chat (pide confirmación al bloquear) y cartel "🚫 Bloqueado".
+- Hay que actualizar el conector en el celu (`curl -fsSL https://wayfarer-crm.vercel.app/conector/android.sh | bash` en una sesión nueva de Termux). El zip está regenerado.
+- También: `0024_carrito_etiqueta_auto` (el mensaje con "carrito armado" etiqueta el chat como "Carrito abandonado"), `0023` (mensaje de transferencia sin repetir a la misma persona en 24 h), página `/transferencias`, audio del festejo (`public/festejo/ankara-messi.mp3`, `app_settings.festejo_audio`).

@@ -11,6 +11,8 @@ import {
   queueWaSticker,
   requestWaHistory,
   setWaChatLabel,
+  getWaBlocked,
+  setWaBlocked,
   unlinkWaLine,
   type WaChat,
   type WaLabel,
@@ -577,6 +579,7 @@ function Conversation({
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [labelsOpen, setLabelsOpen] = useState(false);
+  const [block, setBlock] = useState<{ blocked: boolean; pending: boolean } | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   // Bajar solo la lista de mensajes (scrollIntoView movía también la pantalla y dejaba el chat corrido de costado).
   const toBottom = () => {
@@ -736,6 +739,26 @@ function Conversation({
     onSent();
   }
 
+  useEffect(() => {
+    let live = true;
+    setBlock(null);
+    getWaBlocked(line, chat.jid).then((b) => live && setBlock(b)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [line, chat.jid]);
+
+  async function toggleBlock() {
+    if (!block) return;
+    const next = !block.blocked;
+    const who = chatTitle(chat);
+    if (next && !confirm(`¿Bloquear a ${who}? No te va a poder escribir ni llamar a este teléfono.`)) return;
+    setError(null);
+    const r = await setWaBlocked(line, chat.jid, next);
+    if (!r.ok) return setError(r.error);
+    setBlock({ blocked: next, pending: true });
+  }
+
   async function toggleLabel(id: string, on: boolean) {
     setError(null);
     const r = await setWaChatLabel(line, chat.jid, id, on);
@@ -775,6 +798,9 @@ function Conversation({
               )
             )}
           </p>
+          {block?.blocked && (
+            <p className="mt-1 text-xs font-semibold text-red-600">🚫 Bloqueado{block.pending ? " (aplicándose en el celu…)" : ""}</p>
+          )}
           {chat.labels.length > 0 && (
             <p className="mt-1 flex flex-wrap gap-1">
               {chat.labels.map((id) => {
@@ -784,6 +810,17 @@ function Conversation({
             </p>
           )}
         </div>
+        {block && (
+          <button
+            onClick={toggleBlock}
+            title={block.blocked ? "Desbloquear" : "Bloquear"}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+              block.blocked ? "bg-red-600 text-white hover:bg-red-700" : "bg-stone-100 text-stone-700 hover:bg-red-50 hover:text-red-700"
+            }`}
+          >
+            {block.blocked ? "Desbloquear" : "🚫 Bloquear"}
+          </button>
+        )}
         {labels.length > 0 && (
           <div className="relative shrink-0">
             <button
