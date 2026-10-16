@@ -1,9 +1,9 @@
 // Mensaje automático a los pedidos por transferencia sin acreditar (lo llama la base cada 5 minutos con su clave).
 import { createClient } from "@supabase/supabase-js";
-import { AUTO_TRANSFER } from "@/lib/config";
+import { AUTO_CART, AUTO_TRANSFER } from "@/lib/config";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/env";
 import { monthStart } from "@/lib/goals";
-import { pendingTransferOrders, storeSalesForMonth } from "@/lib/tiendanube";
+import { abandonedCarts, cartMessage, pendingTransferOrders, storeSalesForMonth } from "@/lib/tiendanube";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -42,5 +42,20 @@ export async function GET(req: Request) {
     if (error) skipped.push({ order: o.number, reason: error.message });
     else if (data) queued.push(o.number ?? o.id);
   }
-  return Response.json({ pendientes: res.orders.length, mandados: queued, salteados: skipped }, { headers: { "cache-control": "no-store" } });
+  // Carritos abandonados: el mismo mensaje que /carrito, desde el Teléfono Carritos.
+  const carts = await abandonedCarts(1);
+  const cartsQueued: number[] = [];
+  if (carts?.ok) {
+    for (const c of carts.carts) {
+      const t = Date.parse(c.createdAt);
+      if (!c.phone || !Number.isFinite(t) || t > now - AUTO_CART.afterMinutes * 60_000 || t < now - AUTO_CART.untilMinutes * 60_000) continue;
+      const { data } = await db.rpc("auto_queue_cart", { p_key: key, p_cart_id: c.id, p_line: AUTO_CART.line, p_phone: c.phone, p_body: cartMessage() });
+      if (data) cartsQueued.push(c.id);
+    }
+  }
+
+  return Response.json(
+    { pendientes: res.orders.length, mandados: queued, salteados: skipped, carritos: carts?.ok ? cartsQueued : (carts?.error ?? "sin tienda") },
+    { headers: { "cache-control": "no-store" } },
+  );
 }
