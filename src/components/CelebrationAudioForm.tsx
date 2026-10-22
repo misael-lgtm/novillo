@@ -4,11 +4,16 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { saveCelebrationAudio } from "@/app/goal-actions";
+import { saveCelebrationAudio, type AlertSound } from "@/app/goal-actions";
 
 const MAX_BYTES = 650_000;
 
-export function CelebrationAudioForm({ audio }: { audio: string | null }) {
+const TEXTS: Record<AlertSound, { title: string; help: string }> = {
+  venta: { title: "🔊 Audio del festejo", help: "Suena cada vez que entra una venta off nueva (en las compus que tengan el CRM abierto y el sonido prendido)." },
+  carrito: { title: "🛒 Sonido de carrito nuevo", help: "Suena con el aviso de carrito abandonado nuevo. Si no cargás ninguno, suena un \"ding\"." },
+};
+
+export function CelebrationAudioForm({ audio, which = "venta" }: { audio: string | null; which?: AlertSound }) {
   const router = useRouter();
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -26,11 +31,11 @@ export function CelebrationAudioForm({ audio }: { audio: string | null }) {
 
   async function save(value: string | null) {
     setBusy(true);
-    const r = await saveCelebrationAudio(value);
+    const r = await saveCelebrationAudio(value, which);
     setBusy(false);
     if (!r.ok) return setMsg(r.error);
     setPreview(null);
-    setMsg(value ? "¡Listo! Suena en el próximo festejo." : "Sacado.");
+    setMsg(value ? which === "venta" ? "¡Listo! Suena en el próximo festejo." : "¡Listo! Suena con el próximo carrito." : "Sacado.");
     router.refresh();
   }
 
@@ -38,8 +43,8 @@ export function CelebrationAudioForm({ audio }: { audio: string | null }) {
   return (
     <section className="card space-y-3 p-5">
       <div>
-        <h2 className="font-bold">🔊 Audio del festejo</h2>
-        <p className="text-sm text-stone-500">Suena cada vez que entra una venta off nueva (en las compus que tengan el CRM abierto y el sonido prendido).</p>
+        <h2 className="font-bold">{TEXTS[which].title}</h2>
+        <p className="text-sm text-stone-500">{TEXTS[which].help}</p>
       </div>
       {shown && <audio src={shown} controls className="w-full" />}
       <div className="flex flex-wrap items-center gap-2 text-sm">

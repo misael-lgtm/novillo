@@ -14,7 +14,12 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const team = await getTeam();
   const { mes } = await searchParams;
   const month = mes && /^\d{4}-\d{2}$/.test(mes) ? `${mes}-01` : monthStart();
-  const [goals, celebrationImage, celebrationAudio] = await Promise.all([getGoalSummary(supabase, team, month), getCelebrationImage(), getCelebrationAudio()]);
+  const [goals, celebrationImage, celebrationAudio, cartAudio] = await Promise.all([
+    getGoalSummary(supabase, team, month),
+    getCelebrationImage(),
+    getCelebrationAudio("venta"),
+    getCelebrationAudio("carrito"),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -62,6 +67,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       />
       <CelebrationImageForm image={celebrationImage} />
       <CelebrationAudioForm audio={celebrationAudio} />
+      <CelebrationAudioForm audio={cartAudio} which="carrito" />
       <AddMemberForm sharedLogins={[...new Set(team.map((m) => m.login_email).filter((l): l is string => !!l))]} />
     </div>
   );

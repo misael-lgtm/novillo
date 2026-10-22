@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { NewCart } from "@/app/api/carritos-nuevos/route";
 import { formatMoney } from "@/lib/rules";
+import { getCelebrationAudio } from "@/app/goal-actions";
 
 const POLL_MS = 60_000;
 const SEEN_KEY = "crm_carritos_vistos";
@@ -50,6 +51,7 @@ function ding() {
 export function CartAlerts() {
   const [alerts, setAlerts] = useState<NewCart[]>([]);
   const seenMem = useRef<number[] | null>(null);
+  const sound = useRef<string | null | undefined>(undefined);
 
   const check = useCallback(async () => {
     const carts: NewCart[] | null = await fetch("/api/carritos-nuevos", { cache: "no-store" })
@@ -66,7 +68,10 @@ export function CartAlerts() {
     const fresh = carts.filter((c) => !seen.includes(c.id));
     if (!fresh.length) return;
     setAlerts((prev) => [...fresh, ...prev].slice(0, MAX_SHOWN));
-    ding();
+    // El sonido que cargaron en Equipo; si no hay (o el navegador no deja), el "ding".
+    if (sound.current === undefined) sound.current = await getCelebrationAudio("carrito").catch(() => null);
+    if (sound.current) new Audio(sound.current).play().catch(ding);
+    else ding();
   }, []);
 
   useEffect(() => {
