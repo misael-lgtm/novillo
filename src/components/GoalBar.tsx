@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getGoalSummary, monthLabel, monthStart, pace, percent, type GoalLine, type PaceStatus } from "@/lib/goals";
+import { getGoalSummary, monthLabel, monthStart, pace, percent, toReachPerDay, type GoalLine, type PaceStatus } from "@/lib/goals";
+import { summarizeLocals, type LocalGoal } from "@/lib/locales";
 import { formatMoney, todayAR } from "@/lib/rules";
 import { getTeam, requireMember } from "@/lib/session";
 
@@ -28,6 +29,14 @@ export async function GoalBar() {
   const mine = members.find((x) => x.scope === me.email && x.goal);
   const withGoal = members.filter((x) => x.goal).sort((a, b) => percent(b) - percent(a));
   const teamPace = pace(total, today);
+
+  // Cuánto hay que vender por día en cada canal (off y cada local) para llegar a fin de mes.
+  const { data: localGoals } = await supabase.from("local_goals").select("local, seller, sales_count, avg_ticket").eq("month", month).returns<LocalGoal[]>();
+  const locals = summarizeLocals(store?.ok ? (store.local ?? []) : [], team, localGoals ?? []);
+  const channels = [
+    { name: "Off", perDay: toReachPerDay(total.goal, total.total, today), count: null as number | null },
+    ...locals.map((l) => ({ name: l.label, perDay: toReachPerDay(l.total.goalTotal, l.total.total, today), count: toReachPerDay(l.total.goalCount, l.total.ventas, today) })),
+  ].filter((c) => c.perDay !== null);
   const minePace = mine ? pace(mine, today) : null;
 
   return (
@@ -54,6 +63,18 @@ export async function GoalBar() {
             <span className="text-xs text-stone-500 underline group-open:hidden">Ver detalle</span>
           )}
           {teamPace && <Accumulated expected={teamPace.expected} actual={total.total} day={teamPace.day} we className="basis-full" />}
+          {channels.length > 0 && (
+            <p className="basis-full text-sm">
+              <b>📅 Para llegar, por día:</b>{" "}
+              {channels.map((c, i) => (
+                <span key={c.name}>
+                  {i > 0 && <span className="text-stone-400"> · </span>}
+                  {c.name} <b>{c.perDay! > 0 ? formatMoney(Math.round(c.perDay!)) : "✓ cumplido"}</b>
+                  {c.count && c.perDay! > 0 ? <span className="text-stone-500"> ({Math.ceil(c.count * 10) / 10} ventas)</span> : null}
+                </span>
+              ))}
+            </p>
+          )}
         </summary>
         {store && (
           <p className="mt-3 border-t border-stone-100 pt-3 text-xs text-stone-500">

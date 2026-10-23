@@ -1,4 +1,4 @@
-import { getStoreSales, monthLabel, monthStart, pace, type GoalLine, type PaceStatus } from "@/lib/goals";
+import { getStoreSales, monthLabel, monthStart, pace, toReachPerDay, type GoalLine, type PaceStatus } from "@/lib/goals";
 import { summarizeLocals, type LocalGoal, type LocalLine } from "@/lib/locales";
 import { formatMoney, todayAR } from "@/lib/rules";
 import { getTeam, requireMember } from "@/lib/session";
@@ -87,8 +87,10 @@ function pct(v: number, g: number | null) {
   return g ? `${Math.round((v / g) * 100)}%` : undefined;
 }
 
-function LineMetrics({ l, today, big = false }: { l: LocalLine; today: string; big?: boolean }) {
+function LineMetrics({ l, today, big = false, current = true }: { l: LocalLine; today: string; big?: boolean; current?: boolean }) {
   const totalPace = rhythm(l.total, l.goalTotal, today);
+  const moneyPerDay = current ? toReachPerDay(l.goalTotal, l.total, today) : null;
+  const countPerDay = current ? toReachPerDay(l.goalCount, l.ventas, today) : null;
   const countPace = rhythm(l.ventas, l.goalCount, today);
   const tk = ticketStatus(l.avg, l.goalTicket);
   return (
@@ -111,6 +113,9 @@ function LineMetrics({ l, today, big = false }: { l: LocalLine; today: string; b
           }
         />
         <Bar value={l.total} goal={l.goalTotal} status={totalPace?.status ?? null} />
+        {moneyPerDay !== null && (
+          <p className="text-xs font-semibold">📅 {moneyPerDay > 0 ? `para llegar: ${formatMoney(Math.round(moneyPerDay))} por día` : "objetivo cumplido ✓"}</p>
+        )}
       </div>
       <div className="space-y-1.5">
         <Metric
@@ -130,6 +135,11 @@ function LineMetrics({ l, today, big = false }: { l: LocalLine; today: string; b
           }
         />
         <Bar value={l.ventas} goal={l.goalCount} status={countPace?.status ?? null} />
+        {countPerDay !== null && (
+          <p className="text-xs font-semibold">
+            📅 {countPerDay > 0 ? `para llegar: ${Math.ceil(countPerDay * 10) / 10} ${countPerDay === 1 ? "venta" : "ventas"} por día` : "objetivo cumplido ✓"}
+          </p>
+        )}
       </div>
       <div className="space-y-1.5">
         <Metric
@@ -196,7 +206,7 @@ export default async function LocalesPage({ searchParams }: { searchParams: Prom
               <LocalGoalEditor month={month} local={l.id} seller="" name={`el local ${l.label}`} count={l.total.goalCount} ticket={l.total.goalTicket} />
             )}
           </div>
-          <LineMetrics l={l.total} today={today} big />
+          <LineMetrics l={l.total} today={today} big current={isCurrent} />
 
           <div className="border-t border-stone-100 pt-4">
             <h3 className="mb-3 text-sm font-semibold text-stone-600">Vendedores</h3>
@@ -211,7 +221,7 @@ export default async function LocalesPage({ searchParams }: { searchParams: Prom
                     </p>
                     {me.is_admin && <LocalGoalEditor month={month} local={l.id} seller={s.key} name={s.name} count={s.goalCount} ticket={s.goalTicket} />}
                   </div>
-                  <LineMetrics l={s} today={today} />
+                  <LineMetrics l={s} today={today} current={isCurrent} />
                 </li>
               ))}
             </ul>
