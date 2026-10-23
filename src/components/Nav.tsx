@@ -20,12 +20,12 @@ export function Nav({ name, isAdmin, shared }: { name: string; isAdmin: boolean;
   return (
     <>
       {/* Arriba (compu) */}
-      <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/90 backdrop-blur">
+      <header className="force-light sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 py-3">
           <Link href="/" className="text-lg font-black tracking-tight">
             WAYFARER
           </Link>
-          <nav className="hidden flex-1 items-center gap-1 md:flex">
+          <nav className="hidden flex-1 items-center gap-1 md:flex [&>a]:whitespace-nowrap">
             {LINKS.map((l) =>
               l.primary ? (
                 <Link key={l.href} href={l.href} className="btn-primary ml-2 py-2">
@@ -107,7 +107,7 @@ export function Nav({ name, isAdmin, shared }: { name: string; isAdmin: boolean;
       </header>
 
       {/* Abajo (celu) */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-stone-200 bg-white md:hidden">
+      <nav className="force-light fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-stone-200 bg-white md:hidden">
         {LINKS.map((l) => (
           <Link
             key={l.href}
