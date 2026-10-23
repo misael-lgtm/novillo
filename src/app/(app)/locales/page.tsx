@@ -7,10 +7,10 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 
 export const metadata = { title: "Locales" };
 
-const COLOR: Record<PaceStatus, { bar: string; text: string; dot: string }> = {
-  ok: { bar: "bg-emerald-500", text: "text-emerald-700", dot: "🟢" },
-  warn: { bar: "bg-amber-400", text: "text-amber-700", dot: "🟡" },
-  bad: { bar: "bg-rose-500", text: "text-rose-700", dot: "🔴" },
+const COLOR: Record<PaceStatus, { bar: string; text: string; dot: string; card: string }> = {
+  ok: { bar: "bg-emerald-500", text: "text-emerald-700", dot: "🟢", card: "bg-emerald-100! border-emerald-400!" },
+  warn: { bar: "bg-amber-400", text: "text-amber-700", dot: "🟡", card: "bg-amber-100! border-amber-400!" },
+  bad: { bar: "bg-rose-500", text: "text-rose-700", dot: "🔴", card: "bg-rose-100! border-rose-400!" },
 };
 
 /** Ritmo de algo que se acumula en el mes (facturación o cantidad): verde/amarillo/rojo según lo que hace falta por día. */
@@ -185,7 +185,11 @@ export default async function LocalesPage({ searchParams }: { searchParams: Prom
       {!store?.ok && <p className="card p-4 text-sm">⚠️ No se pudo leer la tienda online: {store ? store.error : "no está conectada"}.</p>}
 
       {locals.map((l) => (
-        <section key={l.id} className="card space-y-5 p-5" aria-label={`Local ${l.label}`}>
+        <section
+          key={l.id}
+          className={`card space-y-5 p-5 ${isCurrent && rhythm(l.total.total, l.total.goalTotal, today) ? COLOR[rhythm(l.total.total, l.total.goalTotal, today)!.status].card : ""}`}
+          aria-label={`Local ${l.label}`}
+        >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-xl font-bold">🏬 {l.label}</h2>
             {me.is_admin && (

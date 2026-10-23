@@ -32,9 +32,8 @@ export async function GoalBar() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 pt-4">
-      {/* Todo el fondo del CRM toma el color del ritmo del equipo, suave, para tener el objetivo siempre presente. */}
-      {teamPace && <div aria-hidden className={`pointer-events-none fixed inset-0 -z-10 transition-colors ${PACE[teamPace.status].page}`} />}
-      <details className="card group px-4 py-3">
+      {/* El recuadro del objetivo toma el color del ritmo del equipo (verde / amarillo / rojo); el fondo del CRM queda negro. */}
+      <details className={`card group px-4 py-3 ${teamPace ? PACE[teamPace.status].page : ""}`}>
         <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-4 gap-y-2 [&::-webkit-details-marker]:hidden">
           <span className="text-sm font-bold">🎯 Objetivo de {monthLabel(month)}</span>
           <Progress line={total} status={teamPace?.status} className="min-w-40 flex-1" />
@@ -114,9 +113,9 @@ export async function GoalBar() {
 }
 
 const PACE: Record<PaceStatus, { bar: string; chip: string; dot: string; label: string; page: string }> = {
-  ok: { bar: "bg-emerald-500", chip: "bg-emerald-100 text-emerald-900", dot: "🟢", label: "Al día", page: "bg-emerald-50" },
-  warn: { bar: "bg-amber-400", chip: "bg-amber-300 text-amber-950", dot: "🟡", label: "Un poco abajo", page: "bg-amber-200" },
-  bad: { bar: "bg-rose-500", chip: "bg-rose-300 text-rose-950", dot: "🔴", label: "Abajo", page: "bg-rose-200" },
+  ok: { bar: "bg-emerald-500", chip: "bg-emerald-100 text-emerald-900", dot: "🟢", label: "Al día", page: "bg-emerald-100! border-emerald-400!" },
+  warn: { bar: "bg-amber-400", chip: "bg-amber-300 text-amber-950", dot: "🟡", label: "Un poco abajo", page: "bg-amber-100! border-amber-400!" },
+  bad: { bar: "bg-rose-500", chip: "bg-rose-300 text-rose-950", dot: "🔴", label: "Abajo", page: "bg-rose-100! border-rose-400!" },
 };
 
 /** Cómo vienen por día contra lo necesario por día. */
