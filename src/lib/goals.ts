@@ -146,3 +146,11 @@ export function pace(
   const expected = needPerDay * d;
   return { status, perDay, needPerDay, ratio, expected, diff: line.total - expected, day: d };
 }
+
+/** Cuánto hay que hacer por día, de hoy (incluido) a fin de mes, para llegar al objetivo. 0 si ya llegaron; null sin objetivo. */
+export function toReachPerDay(goal: number | null, done: number, today: string): number | null {
+  if (!goal) return null;
+  const [y, m, d] = today.split("-").map(Number);
+  const daysLeft = new Date(Date.UTC(y, m, 0)).getUTCDate() - d + 1;
+  return Math.max(0, goal - done) / Math.max(1, daysLeft);
+}
