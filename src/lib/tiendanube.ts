@@ -63,6 +63,8 @@ export type StoreSales =
       off: TnSale[];
       /** Ventas de los locales ("local/Nombre/Palermo"), pagadas en el mes. */
       local?: TnLocalSale[];
+      /** Pedidos que parecen de un local pero no cuentan, con el motivo (para revisar diferencias). */
+      localChecks?: { number: number | null; total: number; date: string; note: string; reason: string }[];
       /** Todos los pedidos pagados del mes por origen, para revisar qué se cuenta y qué no. */
       byOrigin: Record<string, { total: number; ventas: number }>;
       /** Pedidos con "OFF/" o de origen manual (cuenten o no), para revisar. */
@@ -130,6 +132,8 @@ export async function storeSalesForMonth(month: string, { fresh = false }: { fre
   const off: TnSale[] = [];
   const local: TnLocalSale[] = [];
   const checks: TnCheck[] = [];
+  // Para revisar diferencias de los locales: pedidos que parecen de un local pero no cuentan (y por qué).
+  const localChecks: { number: number | null; total: number; date: string; note: string; reason: string }[] = [];
   const byOrigin: Record<string, { total: number; ventas: number }> = {};
   let read = 0;
   try {
@@ -173,6 +177,23 @@ export async function storeSalesForMonth(month: string, { fresh = false }: { fre
           // Los cambios sin diferencia ($0) no son ventas.
           if (loc && !isOff && total > 0) local.push({ id: o.id, number: o.number ?? null, total, local: loc.local, seller: loc.seller, date });
         }
+        {
+          const loc = localOf(text);
+          const looksLocal = /palermo|g[uü]emes|\blocal\b/i.test(text) || (origin === "pos" && !isOff);
+          const why =
+            o.status === "cancelled"
+              ? "cancelado"
+              : !paid
+                ? (PAYMENT_LABELS[o.payment_status] ?? `pago: ${o.payment_status}`)
+                : isOff
+                  ? "tiene off/ (cuenta como venta off)"
+                  : !loc
+                    ? "la nota no dice local/Nombre/Palermo o Güemes"
+                    : total <= 0
+                      ? "monto $0 (cambio)"
+                      : null;
+          if (looksLocal && why) localChecks.push({ number: o.number ?? null, total, date, note: text.slice(0, 120), reason: why });
+        }
         if (!isOff && !manual) continue;
         const reason = !isOff
           ? "sin “off/Nombre” en las notas"
@@ -200,7 +221,7 @@ export async function storeSalesForMonth(month: string, { fresh = false }: { fre
     return { ok: false, error: "No se pudo conectar con Tiendanube" };
   }
   checks.sort((a, b) => b.date.localeCompare(a.date));
-  return { ok: true, off, local, byOrigin, checks, read };
+  return { ok: true, off, local, localChecks, byOrigin, checks, read };
 }
 
 export type TnCustomer = {
