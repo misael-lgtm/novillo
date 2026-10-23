@@ -21,7 +21,7 @@ export default async function TelefonoPage({ params, searchParams }: { params: P
           Instalar el conector
         </Link>
       </div>
-      <nav className="flex gap-1 rounded-xl bg-[#25D366] p-1 [&_span]:bg-[#075E54]!" aria-label="Teléfonos">
+      <nav className="flex gap-1 rounded-xl bg-[#25D366] p-1 [&_span]:bg-[#e11d48]! [&_span]:text-[#fff]! [&_span]:ring-2 [&_span]:ring-[#fff] [&_span]:animate-pulse" aria-label="Teléfonos">
         {PHONE_LINES.map((l) => (
           <Link
             key={l.id}

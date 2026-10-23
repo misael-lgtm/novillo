@@ -40,7 +40,7 @@ export function UnreadBadge({ line, total = false }: { line?: string; total?: bo
   if (!n) return null;
   return (
     <span
-      className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[11px] font-bold text-white"
+      className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[11px] font-bold text-[#fff]"
       aria-label={`${n} ${n === 1 ? "chat sin leer" : "chats sin leer"}`}
     >
       {n > 99 ? "99+" : n}
