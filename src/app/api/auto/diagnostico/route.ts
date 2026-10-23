@@ -23,7 +23,7 @@ export async function GET(req: Request) {
     } catch {
       return Response.json({ error: "q inválido" }, { status: 400 });
     }
-    const r = await productBuyers({ match, from: u.get("desde")!, to: u.get("hasta")!, page: Math.max(1, Number(u.get("pagina")) || 1), pages: 12 });
+    const r = await productBuyers({ match, from: u.get("desde")!, to: u.get("hasta")!, page: Math.max(1, Number(u.get("pagina")) || 1), pages: Math.min(12, Math.max(1, Number(u.get("paginas")) || 3)) });
     return Response.json(r, { headers: { "cache-control": "no-store" } });
   }
   if (u.get("solo") === "depositos") return Response.json(await inventoryProbe(), { headers: { "cache-control": "no-store" } });
