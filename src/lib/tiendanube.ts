@@ -36,12 +36,24 @@ const OFF_MARK = /\bOFF\s*[\/|\-]\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)/i;
 
 /** Venta de un local: en la nota dicen "local/Fabricio/Guemes/point mp". */
 export type TnLocalSale = { id: number; number: number | null; total: number; local: "palermo" | "guemes"; seller: string | null; date: string };
-const LOCAL_MARK = /\blocal\s*\/\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)\s*\/\s*(palermo|g[uü]emes)/i;
-/** De la nota de un pedido: el local y el vendedor ("local/fabricio/guemes" → guemes, Fabricio). */
-export function localOf(note: string): { local: "palermo" | "guemes"; seller: string } | null {
-  const m = note.match(LOCAL_MARK);
+const LOCAL_WORDS = /^(local|cambio|cambios|p|g|palermo|g[uü]emes|eft|efectivo|point|mp|debito|d[eé]b|cred|cr[eé]dito|transfe|transferencia|payway|qr)$/i;
+/**
+ * De la nota de un pedido: el local y el vendedor. Acepta el orden que usan los chicos:
+ * "local/fabricio/guemes", "Local/Palermo/Luana/deb", "Local/Styven/Cambio/Palermo", "Local/P/Cambio/Luana" (P = Palermo, G = Güemes).
+ */
+export function localOf(note: string): { local: "palermo" | "guemes"; seller: string | null } | null {
+  const m = note.match(/\blocal\s*\/([^\n·]*)/i);
   if (!m) return null;
-  return { local: /palermo/i.test(m[2]) ? "palermo" : "guemes", seller: m[1] };
+  const parts = m[1].split("/").map((x) => x.trim()).filter(Boolean).slice(0, 4);
+  let local: "palermo" | "guemes" | null = null;
+  let seller: string | null = null;
+  for (const raw of parts) {
+    const w = raw.split(/\s+/)[0];
+    if (!local && /^(palermo|p)$/i.test(w)) local = "palermo";
+    else if (!local && /^(g[uü]emes|g)$/i.test(w)) local = "guemes";
+    else if (!seller && /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{3,20}$/.test(w) && !LOCAL_WORDS.test(w)) seller = w;
+  }
+  return local ? { local, seller } : null;
 }
 
 /** Fila para revisar en /tiendanube: cada pedido off (o casi) y si cuenta o por qué no. */
