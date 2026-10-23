@@ -113,9 +113,9 @@ export async function GoalBar() {
 }
 
 const PACE: Record<PaceStatus, { bar: string; chip: string; dot: string; label: string; page: string }> = {
-  ok: { bar: "bg-emerald-500", chip: "bg-emerald-100 text-emerald-900", dot: "🟢", label: "Al día", page: "bg-emerald-100! border-emerald-400!" },
-  warn: { bar: "bg-amber-400", chip: "bg-amber-300 text-amber-950", dot: "🟡", label: "Un poco abajo", page: "bg-amber-100! border-amber-400!" },
-  bad: { bar: "bg-rose-500", chip: "bg-rose-300 text-rose-950", dot: "🔴", label: "Abajo", page: "bg-rose-100! border-rose-400!" },
+  ok: { bar: "pace-bar-ok", chip: "pace-chip-ok", dot: "🟢", label: "Al día", page: "pace-card-ok" },
+  warn: { bar: "pace-bar-warn", chip: "pace-chip-warn", dot: "🟡", label: "Un poco abajo", page: "pace-card-warn" },
+  bad: { bar: "pace-bar-bad", chip: "pace-chip-bad", dot: "🔴", label: "Abajo", page: "pace-card-bad" },
 };
 
 /** Cómo vienen por día contra lo necesario por día. */
@@ -137,7 +137,7 @@ function Accumulated({ expected, actual, day, we = false, className = "" }: { ex
     <p className={`text-xs text-stone-600 ${className}`}>
       Acumulado al día {day}: {we ? "deberíamos llevar" : "debería llevar"} <b className="text-stone-900">{formatMoney(Math.round(expected))}</b> ·{" "}
       {we ? "llevamos" : "lleva"} <b className="text-stone-900">{formatMoney(Math.round(actual))}</b>{" "}
-      <b className={diff >= 0 ? "text-emerald-700" : "text-rose-700"}>
+      <b className={diff >= 0 ? "pace-text-ok" : "pace-text-bad"}>
         ({diff >= 0 ? "+" : "−"}
         {formatMoney(Math.abs(diff))})
       </b>
