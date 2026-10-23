@@ -616,3 +616,44 @@ export async function inventoryProbe(): Promise<unknown> {
     : products.body;
   return { locations, names, orderKeys: keys, fulfillmentSample, productsStatus: products.status, sample };
 }
+
+/**
+ * Compradores de un producto (por nombre) en un rango de fechas, para armar listas (ej. "pantalón tom").
+ * Lee de a tandas de páginas para no pasarse del tiempo: devuelve la página por la que seguir (o null si terminó).
+ */
+export async function productBuyers(opts: { match: RegExp; from: string; to: string; page: number; pages: number }) {
+  if (!isConnected()) return null;
+  const rows: { pedido: number | null; fecha: string; nombre: string | null; telefono: string | null; email: string | null; productos: string; total: number; estado: string }[] = [];
+  let page = opts.page;
+  for (; page < opts.page + opts.pages; page++) {
+    const url = new URL(`${API}/${tiendanube.storeId}/orders`);
+    url.search = new URLSearchParams({
+      created_at_min: new Date(`${opts.from}T00:00:00-03:00`).toISOString(),
+      created_at_max: new Date(`${opts.to}T23:59:59-03:00`).toISOString(),
+      per_page: "200",
+      page: String(page),
+      fields: "id,number,status,payment_status,created_at,total,contact_name,contact_email,contact_phone,customer,products",
+    }).toString();
+    const res = await fetch(url, { headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA }, cache: "no-store" });
+    if (res.status === 404) return { rows, next: null };
+    if (!res.ok) return { rows, next: page, error: `Tiendanube respondió ${res.status}` };
+    const list = (await res.json()) as (TnOrder & { contact_name?: string; products?: { name?: unknown; variant_values?: string[] | null; quantity?: number | string }[] })[];
+    for (const o of list) {
+      if (o.status === "cancelled" || o.payment_status !== "paid") continue;
+      const hits = (o.products ?? []).filter((p) => opts.match.test(textOf(p.name as never)));
+      if (!hits.length) continue;
+      rows.push({
+        pedido: o.number ?? null,
+        fecha: (o.created_at ?? "").slice(0, 10),
+        nombre: (o.contact_name || o.customer?.name || "").trim() || null,
+        telefono: normalizePhoneAR(o.contact_phone || o.customer?.phone || null),
+        email: (o.contact_email || o.customer?.email || "").trim().toLowerCase() || null,
+        productos: hits.map((p) => `${textOf(p.name as never)}${p.variant_values?.length ? ` (${p.variant_values.join(" / ")})` : ""} x${Number(p.quantity) || 1}`).join(" + "),
+        total: Number(o.total) || 0,
+        estado: o.payment_status,
+      });
+    }
+    if (list.length < 200) return { rows, next: null };
+  }
+  return { rows, next: page };
+}
