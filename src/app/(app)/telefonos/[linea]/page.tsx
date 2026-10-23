@@ -21,13 +21,13 @@ export default async function TelefonoPage({ params, searchParams }: { params: P
           Instalar el conector
         </Link>
       </div>
-      <nav className="flex gap-1 rounded-xl bg-stone-100 p-1" aria-label="Teléfonos">
+      <nav className="flex gap-1 rounded-xl bg-[#25D366] p-1 [&_span]:bg-[#075E54]!" aria-label="Teléfonos">
         {PHONE_LINES.map((l) => (
           <Link
             key={l.id}
             href={`/telefonos/${l.id}`}
             aria-current={l.id === line.id ? "page" : undefined}
-            className={`flex-1 rounded-lg px-3 py-2 text-center text-sm font-semibold ${l.id === line.id ? "bg-white shadow-sm" : "text-stone-500 hover:text-stone-900"}`}
+            className={`flex-1 rounded-lg px-3 py-2 text-center text-sm font-semibold ${l.id === line.id ? "bg-[#fff] text-[#075E54] shadow-sm" : "text-[#fff] hover:bg-[#1ebe5d]"}`}
           >
             {l.label}
             <UnreadBadge line={l.id} />
