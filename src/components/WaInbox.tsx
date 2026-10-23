@@ -371,8 +371,8 @@ export function WaInbox({
         )}
         <AdCounter line={line} />
       </div>
-      <div className="card grid h-[calc(100dvh-22rem)] min-h-[28rem] grid-cols-1 overflow-hidden shadow-sm md:grid-cols-[22rem_minmax(0,1fr)]">
-        <aside className={`flex min-h-0 flex-col border-stone-200 md:border-r ${open ? "hidden md:flex" : "flex"}`}>
+      <div className="force-light card grid h-[calc(100dvh-22rem)] min-h-[28rem] grid-cols-1 overflow-hidden shadow-sm md:grid-cols-[22rem_minmax(0,1fr)]">
+        <aside className={`flex min-h-0 flex-col border-stone-200 bg-[#f0f2f5] md:border-r ${open ? "hidden md:flex" : "flex"}`}>
           <div className="space-y-2.5 border-b border-stone-200 p-3">
             <div className="flex items-center gap-2">
               <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-stone-100 px-3.5 py-2 text-stone-500 focus-within:ring-2 focus-within:ring-emerald-400">
@@ -860,7 +860,7 @@ function Conversation({
       </header>
       <div
         ref={scroller}
-        className="wa-messages min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-stone-100 px-3 py-4 md:px-8"
+        className="wa-messages min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-[#efeae2] px-3 py-4 md:px-8"
         style={{ backgroundImage: "radial-gradient(var(--color-stone-200, #e7e5e4) 1px, transparent 1px)", backgroundSize: "18px 18px" }}
         onScroll={(e) => {
           const el = e.currentTarget;
