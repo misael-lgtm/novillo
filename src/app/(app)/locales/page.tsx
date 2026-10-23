@@ -8,9 +8,9 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 export const metadata = { title: "Locales" };
 
 const COLOR: Record<PaceStatus, { bar: string; text: string; dot: string; card: string }> = {
-  ok: { bar: "bg-emerald-500", text: "text-emerald-700", dot: "🟢", card: "bg-emerald-100! border-emerald-400!" },
-  warn: { bar: "bg-amber-400", text: "text-amber-700", dot: "🟡", card: "bg-amber-100! border-amber-400!" },
-  bad: { bar: "bg-rose-500", text: "text-rose-700", dot: "🔴", card: "bg-rose-100! border-rose-400!" },
+  ok: { bar: "pace-bar-ok", text: "pace-text-ok", dot: "🟢", card: "pace-card-ok" },
+  warn: { bar: "pace-bar-warn", text: "pace-text-warn", dot: "🟡", card: "pace-card-warn" },
+  bad: { bar: "pace-bar-bad", text: "pace-text-bad", dot: "🔴", card: "pace-card-bad" },
 };
 
 /** Ritmo de algo que se acumula en el mes (facturación o cantidad): verde/amarillo/rojo según lo que hace falta por día. */

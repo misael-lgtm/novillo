@@ -177,3 +177,32 @@ html.dark body {
 @utility card {
   @apply rounded-xl border border-stone-200 bg-white;
 }
+
+/* ── Colores del ritmo del objetivo (verde / amarillo / rojo) ──────
+   Fijos, no siguen la inversión del modo oscuro: así el rojo es rojo y
+   el amarillo es amarillo en los dos modos. */
+.pace-card-ok { background: #dcfce7 !important; border: 2px solid #16a34a !important; }
+.pace-card-warn { background: #fef9c3 !important; border: 2px solid #eab308 !important; }
+.pace-card-bad { background: #fee2e2 !important; border: 2px solid #dc2626 !important; }
+.pace-chip-ok { background: #bbf7d0; color: #14532d; }
+.pace-chip-warn { background: #fde047; color: #422006; }
+.pace-chip-bad { background: #fecaca; color: #7f1d1d; }
+.pace-bar-ok { background: #16a34a; }
+.pace-bar-warn { background: #eab308; }
+.pace-bar-bad { background: #dc2626; }
+.pace-text-ok { color: #15803d; }
+.pace-text-warn { color: #a16207; }
+.pace-text-bad { color: #b91c1c; }
+
+html.dark .pace-card-ok { background: #052e16 !important; border-color: #22c55e !important; }
+html.dark .pace-card-warn { background: #3d3500 !important; border-color: #facc15 !important; }
+html.dark .pace-card-bad { background: #4c0808 !important; border-color: #ef4444 !important; }
+html.dark .pace-chip-ok { background: #166534; color: #dcfce7; }
+html.dark .pace-chip-warn { background: #facc15; color: #1c1600; }
+html.dark .pace-chip-bad { background: #b91c1c; color: #fee2e2; }
+html.dark .pace-bar-ok { background: #22c55e; }
+html.dark .pace-bar-warn { background: #facc15; }
+html.dark .pace-bar-bad { background: #ef4444; }
+html.dark .pace-text-ok { color: #4ade80; }
+html.dark .pace-text-warn { color: #facc15; }
+html.dark .pace-text-bad { color: #f87171; }
