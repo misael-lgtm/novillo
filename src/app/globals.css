@@ -149,6 +149,10 @@ html.dark {
 body {
   @apply bg-stone-50 text-stone-900 antialiased;
 }
+/* Fondo del CRM: negro. */
+html.dark body {
+  background: #000;
+}
 
 /* Inputs grandes y claros: nadie tiene que hacer zoom en el celu */
 @utility input {
