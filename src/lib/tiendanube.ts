@@ -377,8 +377,51 @@ export async function abandonedCarts(days = 30): Promise<{ ok: true; carts: TnCa
   } catch {
     return { ok: false, error: "No se pudo conectar con Tiendanube" };
   }
-  carts.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return { ok: true, carts };
+  // Fuera los carritos vacíos ($0) y los de gente que después hizo un pedido (compró, o dejó la transferencia pendiente).
+  const buyers = await buyersSince(since);
+  const bought = (c: TnCart) => {
+    const t = Date.parse(c.createdAt) || 0;
+    const at = Math.max(c.email ? (buyers.email.get(c.email) ?? 0) : 0, c.phone ? (buyers.phone.get(c.phone) ?? 0) : 0);
+    return at >= t - 10 * 60_000; // el pedido es posterior al carrito (con 10 min de margen)
+  };
+  const live = carts.filter((c) => c.total > 0 && c.products.length > 0 && !bought(c));
+  live.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return { ok: true, carts: live };
+}
+
+/** Quiénes hicieron un pedido (no cancelado) desde esa fecha: el último momento por mail y por celular. */
+async function buyersSince(sinceIso: string): Promise<{ email: Map<string, number>; phone: Map<string, number> }> {
+  const email = new Map<string, number>();
+  const phone = new Map<string, number>();
+  try {
+    for (let page = 1; page <= 30; page++) {
+      const url = new URL(`${API}/${tiendanube.storeId}/orders`);
+      url.search = new URLSearchParams({
+        created_at_min: sinceIso,
+        per_page: "200",
+        page: String(page),
+        fields: "id,status,created_at,contact_email,contact_phone,customer",
+      }).toString();
+      const res = await fetch(url, {
+        headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA },
+        next: { revalidate: Number(process.env.TIENDANUBE_REVALIDATE_SECONDS) || 120 },
+      });
+      if (!res.ok) break;
+      const list = (await res.json()) as TnOrder[];
+      for (const o of list) {
+        if (o.status === "cancelled") continue;
+        const t = Date.parse(o.created_at ?? "") || 0;
+        const e = (o.contact_email || o.customer?.email || "").trim().toLowerCase();
+        const p = normalizePhoneAR(o.contact_phone || o.customer?.phone || null);
+        if (e && t > (email.get(e) ?? 0)) email.set(e, t);
+        if (p && t > (phone.get(p) ?? 0)) phone.set(p, t);
+      }
+      if (list.length < 200) break;
+    }
+  } catch {
+    // sin pedidos: se muestran todos los carritos
+  }
+  return { email, phone };
 }
 
 /** "Buzo Alaska (M) x2, Remera Lino (L)" */
