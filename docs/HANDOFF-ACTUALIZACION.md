@@ -860,3 +860,12 @@ El usuario quiere ver todos esos contactos en el tablero.
 - CRM: botón "🚫 Bloquear" / "Desbloquear" en el encabezado del chat (pide confirmación al bloquear) y cartel "🚫 Bloqueado".
 - Hay que actualizar el conector en el celu (`curl -fsSL https://wayfarer-crm.vercel.app/conector/android.sh | bash` en una sesión nueva de Termux). El zip está regenerado.
 - También: `0024_carrito_etiqueta_auto` (el mensaje con "carrito armado" etiqueta el chat como "Carrito abandonado"), `0023` (mensaje de transferencia sin repetir a la misma persona en 24 h), página `/transferencias`, audio del festejo (`public/festejo/ankara-messi.mp3`, `app_settings.festejo_audio`).
+
+## §42 App para Android (PWA) y cambios de la semana
+
+- `src/app/manifest.ts` + íconos en `public/app-icons/` (generados con sharp desde la "W"): el CRM se instala desde Chrome ("Instalar app") y abre a pantalla completa. `/manifest.webmanifest` está en `PUBLIC_PATHS` del middleware. Sin service worker (a propósito: nada de caché vieja).
+- Ventas del mes: cron `ventas-cada-minuto` (`/api/auto/transferencias?parte=ventas`); mensajes automáticos siguen cada 5 min (`parte=mensajes`). Locales se refresca sola (`AutoRefresh`).
+- Mensaje automático a carritos abandonados (0027/0028: una vez por persona), etiqueta de pauta automática (0026), bloqueos (0025), carritos sin vacíos ni compradores.
+- `localOf` acepta la nota en cualquier orden (P/G); `localChecks` en el snapshot para revisar diferencias.
+- Diseño: fondo #121212, barra de arriba siempre clara (`force-light`), colores fijos del ritmo (`pace-*`), pestañas de teléfonos verde WhatsApp, chats claros.
+- "Para llegar, por día" por canal (`toReachPerDay`) en el recuadro del objetivo y en Locales.
