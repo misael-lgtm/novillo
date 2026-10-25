@@ -2,7 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // /api/auto: la llama el reloj de la base (pg_cron); se valida con su propia clave.
-const PUBLIC_PATHS = ["/login", "/auth", "/api/auto/"];
+// /manifest.webmanifest: el celu lo pide sin sesión para poder instalar la app.
+const PUBLIC_PATHS = ["/login", "/auth", "/api/auto/", "/manifest.webmanifest"];
 
 import { SUPABASE_ANON_KEY as SUPABASE_KEY, SUPABASE_URL, looksLikeKey } from "@/lib/supabase/env";
 

@@ -5,6 +5,9 @@ import { themeInitScript } from "@/lib/theme";
 export const metadata: Metadata = {
   title: "Wayfarer CRM",
   description: "Pedidos, clientes y tareas de Wayfarer",
+  applicationName: "Wayfarer CRM",
+  appleWebApp: { capable: true, title: "Wayfarer", statusBarStyle: "black-translucent" },
+  icons: { apple: "/app-icons/apple-180.png" },
 };
 
 export const viewport: Viewport = {
