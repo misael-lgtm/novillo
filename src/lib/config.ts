@@ -211,9 +211,9 @@ export const AUTO_TRANSFER = {
   body: "Hola como va? Te hablo de administracion de Wayfarer vimos que tenes una transferencia pendiente y queriamos saber si la vas a finalizar, mas que nada por que tenemos el producto reservado en la orden y sino tenemos que disponer de el.\nNos podrias confirmar?",
 } as const;
 
-/** Mensaje automático a los carritos abandonados: desde el Teléfono Carritos, entre 30 min y 3 h después de armado el carrito. */
+/** Mensaje automático a los carritos abandonados: desde el Teléfono Carritos, apenas aparece el carrito (hasta 3 h después). */
 export const AUTO_CART = {
   line: "carritos",
-  afterMinutes: 30,
+  afterMinutes: 0,
   untilMinutes: 180,
 } as const;
