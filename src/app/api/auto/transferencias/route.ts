@@ -1,4 +1,4 @@
-// Mensajes automáticos (transferencias y carritos, cada 5 min) y ventas del mes para el objetivo (cada minuto). Lo llama la base con su clave.
+// Reloj de la base (cada 5 min): ventas del mes para los objetivos, mensajes de transferencias y de carritos. Lo llama la base con su clave.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { AUTO_CART, AUTO_TRANSFER } from "@/lib/config";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/env";
