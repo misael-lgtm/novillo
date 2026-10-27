@@ -187,7 +187,8 @@ export async function storeSalesForMonth(
         const manual = OFF_ORIGINS.includes(origin);
         // Venta off = marcada "off/Nombre" en las notas. Los manuales sin marca se muestran para revisar, pero no cuentan.
         const isOff = !!offName;
-        const paid = o.payment_status === "paid" && o.status !== "cancelled";
+        // "partially_refunded" (le devolvieron una parte, ej. sacaron un producto) también es venta.
+        const paid = (o.payment_status === "paid" || o.payment_status === "partially_refunded") && o.status !== "cancelled";
         if (paid) {
           const b = (byOrigin[origin] ??= { total: 0, ventas: 0 });
           b.total += total;

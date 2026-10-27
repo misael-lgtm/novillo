@@ -38,7 +38,7 @@ function usePoll(fn: () => Promise<unknown>, deps: unknown[]) {
         .finally(() => (busy = false));
     };
     run();
-    return onLive(["wa_messages", "wa_chats", "wa_chat_labels"], run, 30_000);
+    return onLive(["wa_messages", "wa_chats", "wa_chat_labels"], run, 30_000, 3_000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }
@@ -1177,7 +1177,7 @@ function AdCounter({ line }: { line: string }) {
         .then((r) => alive && setStats(r))
         .catch(() => {});
     load();
-    const stop = onLive(["wa_chats"], load, 5 * 60_000);
+    const stop = onLive(["wa_chats"], load, 5 * 60_000, 60_000);
     return () => {
       alive = false;
       stop();

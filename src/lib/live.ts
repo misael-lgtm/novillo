@@ -5,6 +5,12 @@
 
 import { createClient } from "@/lib/supabase/client";
 
+/**
+ * true cuando en la base están activados los avisos en vivo de estas tablas (migración 0032_realtime).
+ * Mientras sea false, se sigue preguntando seguido (como antes), así nada anda más lento.
+ */
+export const LIVE_READY = false;
+
 type Topic = "wa_messages" | "wa_chats" | "wa_chat_labels" | "live_ping";
 const listeners = new Map<Topic, Set<() => void>>();
 let started = false;
@@ -23,7 +29,8 @@ function start() {
  * Llama a fn cuando cambia alguna de esas tablas (agrupando cambios seguidos) y, por las dudas, cada fallbackMs
  * mientras la pestaña está a la vista. Al volver a la pestaña también refresca.
  */
-export function onLive(tables: Topic[], fn: () => void, fallbackMs: number): () => void {
+export function onLive(tables: Topic[], fn: () => void, fallbackMs: number, withoutLiveMs = fallbackMs): () => void {
+  if (!LIVE_READY) fallbackMs = withoutLiveMs;
   start();
   let timer: ReturnType<typeof setTimeout> | null = null;
   const fire = () => {

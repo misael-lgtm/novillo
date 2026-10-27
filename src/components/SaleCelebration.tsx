@@ -70,7 +70,7 @@ export function SaleCelebration() {
 
   useEffect(() => {
     check();
-    return onLive(["live_ping"], check, POLL_MS);
+    return onLive(["live_ping"], check, POLL_MS, 60_000);
   }, [check]);
 
   useEffect(() => {

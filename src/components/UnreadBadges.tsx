@@ -24,7 +24,7 @@ export function useUnread() {
   useEffect(() => {
     listeners.add(setCounts);
     refresh();
-    const stop = onLive(["wa_messages", "wa_chats"], refresh, 120_000);
+    const stop = onLive(["wa_messages", "wa_chats"], refresh, 120_000, 20_000);
     return () => {
       listeners.delete(setCounts);
       stop();

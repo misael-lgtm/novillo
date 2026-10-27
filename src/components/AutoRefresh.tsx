@@ -19,6 +19,7 @@ export function AutoRefresh({ seconds = 60 }: { seconds?: number }) {
         if (!typing) router.refresh();
       },
       seconds * 1000,
+      60_000,
     );
   }, [router, seconds]);
   return null;
