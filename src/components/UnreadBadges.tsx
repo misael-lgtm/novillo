@@ -1,14 +1,15 @@
 "use client";
 
-// Chats sin leer por teléfono: se piden cada 20 s (mientras el CRM está a la vista) y se comparten entre las pestañas y el menú.
+// Chats sin leer por teléfono: se piden cuando llega un mensaje (aviso en vivo) o cada 2 min, y se comparten entre las pestañas y el menú.
 import { useEffect, useState } from "react";
+import { onLive } from "@/lib/live";
 
 let cache: Record<string, number> | null = null;
 let last = 0;
 const listeners = new Set<(c: Record<string, number>) => void>();
 
 async function refresh() {
-  if (Date.now() - last < 15_000) return;
+  if (Date.now() - last < 3_000) return;
   last = Date.now();
   const r = await fetch("/api/wa/no-leidos", { cache: "no-store" })
     .then((x) => (x.ok && x.headers.get("content-type")?.includes("json") ? x.json() : null))
@@ -23,10 +24,10 @@ export function useUnread() {
   useEffect(() => {
     listeners.add(setCounts);
     refresh();
-    const t = setInterval(() => document.visibilityState === "visible" && refresh(), 20_000);
+    const stop = onLive(["wa_messages", "wa_chats"], refresh, 120_000, 20_000);
     return () => {
       listeners.delete(setCounts);
-      clearInterval(t);
+      stop();
     };
   }, []);
   return counts;
