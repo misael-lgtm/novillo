@@ -20,8 +20,18 @@ export async function GET(req: Request) {
   // De paso, guardar las ventas del mes frescas para el objetivo (el CRM las lee de la base).
   if (parte !== "mensajes") {
     const month = monthStart();
-    const sales = await storeSalesForMonth(month, { fresh: true });
-    if (sales?.ok) await db.rpc("save_store_snapshot", { p_key: key, p_month: month, p_data: sales });
+    // Liviano: casi siempre se leen solo los pedidos que cambiaron desde la última vez (con unos minutos de margen)
+    // y se mezclan con lo guardado. Una vez por hora (o si hace mucho que no se guardaba) se relee el mes entero.
+    const { data: last } = await db.rpc("store_snapshot_updated_at", { p_key: key, p_month: month });
+    const lastMs = last ? Date.parse(last as string) : NaN;
+    const minute = new Date().getUTCMinutes();
+    const full = params.get("todo") === "1" || !Number.isFinite(lastMs) || Date.now() - lastMs > 30 * 60_000 || minute < 5;
+    const sales = await storeSalesForMonth(month, { fresh: true, updatedSince: full ? undefined : lastMs - 5 * 60_000 });
+    if (sales?.ok) {
+      const { seen = [], ...data } = sales;
+      if (full) await db.rpc("save_store_snapshot", { p_key: key, p_month: month, p_data: data });
+      else await db.rpc("merge_store_snapshot", { p_key: key, p_month: month, p_seen: seen, p_data: data });
+    }
     // Cada minuto, además, el mensaje a los carritos nuevos (así sale apenas entra el carrito).
     if (parte === "ventas") {
       const carritos = await queueCarts(db, key);

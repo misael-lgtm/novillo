@@ -76,7 +76,7 @@ export type StoreSales =
       /** Ventas de los locales ("local/Nombre/Palermo"), pagadas en el mes. */
       local?: TnLocalSale[];
       /** Pedidos que parecen de un local pero no cuentan, con el motivo (para revisar diferencias). */
-      localChecks?: { number: number | null; total: number; date: string; note: string; reason: string }[];
+      localChecks?: { id?: number; number: number | null; total: number; date: string; note: string; reason: string }[];
       /** Todos los pedidos pagados del mes por origen, para revisar qué se cuenta y qué no. */
       byOrigin: Record<string, { total: number; ventas: number }>;
       /** Pedidos con "OFF/" o de origen manual (cuenten o no), para revisar. */
@@ -134,7 +134,10 @@ const PAYMENT_LABELS: Record<string, string> = {
  * Pide los pedidos actualizados desde el día 1, así entran los creados antes pero cobrados este mes.
  * null si no está conectada.
  */
-export async function storeSalesForMonth(month: string, { fresh = false }: { fresh?: boolean } = {}): Promise<StoreSales | null> {
+export async function storeSalesForMonth(
+  month: string,
+  { fresh = false, updatedSince }: { fresh?: boolean; updatedSince?: number } = {},
+): Promise<(StoreSales & { seen?: number[] }) | null> {
   if (!isConnected()) return null;
   const [y, m] = month.split("-").map(Number);
   const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
@@ -145,14 +148,17 @@ export async function storeSalesForMonth(month: string, { fresh = false }: { fre
   const local: TnLocalSale[] = [];
   const checks: TnCheck[] = [];
   // Para revisar diferencias de los locales: pedidos que parecen de un local pero no cuentan (y por qué).
-  const localChecks: { number: number | null; total: number; date: string; note: string; reason: string }[] = [];
+  const localChecks: { id: number; number: number | null; total: number; date: string; note: string; reason: string }[] = [];
   const byOrigin: Record<string, { total: number; ventas: number }> = {};
+  // Ids de todos los pedidos leídos (para la actualización parcial: se reemplazan en lo guardado).
+  const seen: number[] = [];
   let read = 0;
   try {
     for (let page = 1; page <= 100; page++) {
       const url = new URL(`${API}/${tiendanube.storeId}/orders`);
       url.search = new URLSearchParams({
-        updated_at_min: new Date(from).toISOString(),
+        // Parcial: solo lo que cambió desde la última vez (mucho más rápido que releer todo el mes).
+        updated_at_min: new Date(Math.max(from, updatedSince ?? from)).toISOString(),
         status: "any",
         per_page: "200",
         page: String(page),
@@ -170,6 +176,7 @@ export async function storeSalesForMonth(month: string, { fresh = false }: { fre
       const orders = (await res.json()) as TnOrder[];
       read += orders.length;
       for (const o of orders) {
+        seen.push(o.id);
         const date = o.paid_at || o.created_at || "";
         const t = Date.parse(date);
         if (Number.isFinite(t) && !(t >= from && t < to)) continue; // de otro mes (sin fecha: se cuenta, ya vino filtrado por actualización)
@@ -204,7 +211,7 @@ export async function storeSalesForMonth(month: string, { fresh = false }: { fre
                     : total <= 0
                       ? "monto $0 (cambio)"
                       : null;
-          if (looksLocal && why) localChecks.push({ number: o.number ?? null, total, date, note: text.slice(0, 120), reason: why });
+          if (looksLocal && why) localChecks.push({ id: o.id, number: o.number ?? null, total, date, note: text.slice(0, 120), reason: why });
         }
         if (!isOff && !manual) continue;
         const reason = !isOff
@@ -233,7 +240,7 @@ export async function storeSalesForMonth(month: string, { fresh = false }: { fre
     return { ok: false, error: "No se pudo conectar con Tiendanube" };
   }
   checks.sort((a, b) => b.date.localeCompare(a.date));
-  return { ok: true, off, local, localChecks, byOrigin, checks, read };
+  return { ok: true, off, local, localChecks, byOrigin, checks, read, seen };
 }
 
 export type TnCustomer = {

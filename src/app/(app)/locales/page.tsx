@@ -178,7 +178,7 @@ export default async function LocalesPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-6">
-      {isCurrent && <AutoRefresh seconds={60} />}
+      {isCurrent && <AutoRefresh seconds={600} />}
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
           <h1 className="text-2xl font-bold">🏬 Locales</h1>

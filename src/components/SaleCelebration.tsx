@@ -7,8 +7,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getCelebrationAudio, getCelebrationImage, type OffSale } from "@/app/goal-actions";
 import { formatMoney } from "@/lib/rules";
+import { onLive } from "@/lib/live";
 
-const POLL_MS = 60_000;
+const POLL_MS = 5 * 60_000; // por las dudas; normalmente avisa la base apenas se guardan las ventas
 const SEEN_KEY = "crm_ventas_off_vistas";
 const EMOJIS = ["💸", "🔥", "🎉", "🤑", "💰", "🥳", "🚀", "💙"];
 const DURATION_MS = 5500;
@@ -69,8 +70,7 @@ export function SaleCelebration() {
 
   useEffect(() => {
     check();
-    const t = setInterval(() => document.visibilityState === "visible" && check(), POLL_MS);
-    return () => clearInterval(t);
+    return onLive(["live_ping"], check, POLL_MS);
   }, [check]);
 
   useEffect(() => {

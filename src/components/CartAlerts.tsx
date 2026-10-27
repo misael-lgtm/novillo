@@ -8,7 +8,7 @@ import type { NewCart } from "@/app/api/carritos-nuevos/route";
 import { formatMoney } from "@/lib/rules";
 import { getCelebrationAudio } from "@/app/goal-actions";
 
-const POLL_MS = 60_000;
+const POLL_MS = 3 * 60_000;
 const SEEN_KEY = "crm_carritos_vistos";
 const MAX_SHOWN = 3;
 

@@ -24,10 +24,9 @@ import {
 import { WaPicker, type PickerTab } from "./WaPicker";
 import { formatPhone } from "@/lib/rules";
 import { createClient } from "@/lib/supabase/client";
+import { onLive } from "@/lib/live";
 
-const POLL_MS = 3000;
-
-/** Cada pocos segundos, mientras la pestaña está a la vista (sin pisarse: si la anterior no volvió, espera). */
+/** Se recarga cuando llega algo nuevo (aviso en vivo de la base) y, por las dudas, cada 30 s (sin pisarse: si la anterior no volvió, espera). */
 function usePoll(fn: () => Promise<unknown>, deps: unknown[]) {
   useEffect(() => {
     let busy = false;
@@ -39,8 +38,7 @@ function usePoll(fn: () => Promise<unknown>, deps: unknown[]) {
         .finally(() => (busy = false));
     };
     run();
-    const t = setInterval(() => document.visibilityState === "visible" && run(), POLL_MS);
-    return () => clearInterval(t);
+    return onLive(["wa_messages", "wa_chats", "wa_chat_labels"], run, 30_000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }
@@ -1179,10 +1177,10 @@ function AdCounter({ line }: { line: string }) {
         .then((r) => alive && setStats(r))
         .catch(() => {});
     load();
-    const t = setInterval(() => document.visibilityState === "visible" && load(), 60_000);
+    const stop = onLive(["wa_chats"], load, 5 * 60_000);
     return () => {
       alive = false;
-      clearInterval(t);
+      stop();
     };
   }, [line]);
   if (!stats) return null;
