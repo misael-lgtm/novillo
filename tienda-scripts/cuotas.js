@@ -1,12 +1,11 @@
 // Script para la tienda (Tiendanube, plantilla Ipanema): escribe "N cuotas sin interés de $X"
 // debajo de cada precio, en los listados y en la página de producto.
-// Copia la configuración de cuotas sin interés de Pago Nube: 12 cuotas desde $100.000 y 3 cuotas
-// sin monto mínimo. Si cambian la configuración, cambiar acá.
+// Copia la configuración de cuotas sin interés de Pago Nube: 12 cuotas sin monto mínimo.
+// Si cambian la configuración, cambiar acá (ej. { cuotas: 3, minimo: 0 } debajo de un mínimo de 12).
 (function () {
   // De mayor a menor: se usa la primera opción cuyo mínimo alcanza el precio.
   var OPCIONES = [
-    { cuotas: 12, minimo: 100000 },
-    { cuotas: 3, minimo: 0 },
+    { cuotas: 12, minimo: 0 },
   ];
   var MARCA = "wf-cuotas";
 
