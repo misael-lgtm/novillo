@@ -1,10 +1,13 @@
-// Script para la tienda (Tiendanube, plantilla Ipanema): escribe "12 cuotas sin interés de $X"
+// Script para la tienda (Tiendanube, plantilla Ipanema): escribe "N cuotas sin interés de $X"
 // debajo de cada precio, en los listados y en la página de producto.
-// Las 12 cuotas sin interés están configuradas en Pago Nube desde $100.000, así que solo se
-// muestra en los precios que llegan a ese monto. Si cambian la configuración, cambiar acá.
+// Copia la configuración de cuotas sin interés de Pago Nube: 12 cuotas desde $100.000 y 3 cuotas
+// sin monto mínimo. Si cambian la configuración, cambiar acá.
 (function () {
-  var CUOTAS = 12;
-  var MINIMO = 100000;
+  // De mayor a menor: se usa la primera opción cuyo mínimo alcanza el precio.
+  var OPCIONES = [
+    { cuotas: 12, minimo: 100000 },
+    { cuotas: 3, minimo: 0 },
+  ];
   var MARCA = "wf-cuotas";
 
   // "$117.647,05" -> 117647.05
@@ -24,11 +27,18 @@
     if (!lugar) return;
     var linea = lugar.nextElementSibling && lugar.nextElementSibling.classList.contains(MARCA) ? lugar.nextElementSibling : null;
 
-    if (precio === null || precio < MINIMO) {
+    var opcion = null;
+    for (var i = 0; precio && i < OPCIONES.length; i++) {
+      if (precio >= OPCIONES[i].minimo) {
+        opcion = OPCIONES[i];
+        break;
+      }
+    }
+    if (!opcion) {
       if (linea) linea.remove();
       return;
     }
-    var texto = CUOTAS + " cuotas sin interés de " + formatear(precio / CUOTAS);
+    var texto = opcion.cuotas + " cuotas sin interés de " + formatear(precio / opcion.cuotas);
     if (!linea) {
       linea = document.createElement("div");
       linea.className = MARCA;
