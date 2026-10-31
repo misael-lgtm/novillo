@@ -667,3 +667,43 @@ export async function productBuyers(opts: { match: RegExp; from: string; to: str
   }
   return { rows, next: page };
 }
+
+/** Pedidos de un rango con envío/retiro que coincide (ej. "retiro en local Güemes"): para revisar diferencias de los locales. */
+export async function pickupOrders(opts: { match: RegExp; from: string; to: string; page: number; pages: number }) {
+  if (!isConnected()) return null;
+  type Row = { pedido: number | null; fecha: string; nombre: string | null; total: number; pago: string; estado: string; envio: string; nota: string };
+  const rows: Row[] = [];
+  let page = opts.page;
+  for (; page < opts.page + opts.pages; page++) {
+    const url = new URL(`${API}/${tiendanube.storeId}/orders`);
+    url.search = new URLSearchParams({
+      created_at_min: new Date(`${opts.from}T00:00:00-03:00`).toISOString(),
+      created_at_max: new Date(`${opts.to}T23:59:59-03:00`).toISOString(),
+      per_page: "200",
+      page: String(page),
+    }).toString();
+    const res = await fetch(url, { headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA }, cache: "no-store" });
+    if (res.status === 404) return { rows, next: null };
+    if (!res.ok) return { rows, next: page, error: `Tiendanube respondió ${res.status}` };
+    const list = (await res.json()) as (TnOrder & Record<string, unknown>)[];
+    for (const o of list) {
+      const envio = [o.shipping_option, o.shipping_store_branch_name, o.shipping_pickup_type, JSON.stringify(o.shipping_pickup_details ?? "")]
+        .map((x) => (typeof x === "string" ? x : textOf(x)))
+        .filter(Boolean)
+        .join(" · ");
+      if (!opts.match.test(envio)) continue;
+      rows.push({
+        pedido: o.number ?? null,
+        fecha: (o.paid_at || o.created_at || "").slice(0, 10),
+        nombre: ((o.contact_name as string) || o.customer?.name || "").trim() || null,
+        total: Number(o.total) || 0,
+        pago: o.payment_status,
+        estado: o.status,
+        envio: envio.slice(0, 160),
+        nota: noteText(o).slice(0, 160),
+      });
+    }
+    if (list.length < 200) return { rows, next: null };
+  }
+  return { rows, next: page };
+}
