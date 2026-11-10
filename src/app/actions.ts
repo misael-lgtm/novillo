@@ -863,3 +863,23 @@ export async function saveLocalGoal(input: { month: string; local: string; selle
   revalidatePath("/locales");
   return { ok: true };
 }
+
+/** Copiar los objetivos de los locales de un mes al siguiente (solo admin; no pisa los que ya estén cargados). */
+export async function copyLocalGoals(fromMonth: string, toMonth: string): Promise<ActionResult<{ copied: number }>> {
+  const { supabase, me } = await requireMember();
+  if (!me.is_admin) return { ok: false, error: "Solo el admin carga objetivos." };
+  if (!/^\d{4}-\d{2}-01$/.test(fromMonth) || !/^\d{4}-\d{2}-01$/.test(toMonth)) return { ok: false, error: "Mes inválido." };
+  const [{ data: from }, { data: existing }] = await Promise.all([
+    supabase.from("local_goals").select("local, seller, sales_count, avg_ticket").eq("month", fromMonth),
+    supabase.from("local_goals").select("local, seller").eq("month", toMonth),
+  ]);
+  const taken = new Set((existing ?? []).map((g) => `${g.local}|${g.seller}`));
+  const rows = (from ?? [])
+    .filter((g) => !taken.has(`${g.local}|${g.seller}`))
+    .map((g) => ({ ...g, month: toMonth, updated_by: me.email, updated_at: new Date().toISOString() }));
+  if (!rows.length) return { ok: true, data: { copied: 0 } };
+  const { error } = await supabase.from("local_goals").insert(rows);
+  if (error) return { ok: false, error: "No se pudo copiar." };
+  revalidatePath("/locales");
+  return { ok: true, data: { copied: rows.length } };
+}

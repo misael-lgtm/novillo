@@ -4,6 +4,7 @@ import { formatMoney, todayAR } from "@/lib/rules";
 import { getTeam, requireMember } from "@/lib/session";
 import { LocalGoalEditor } from "@/components/LocalGoalEditor";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { CopyLocalGoals } from "@/components/CopyLocalGoals";
 
 export const metadata = { title: "Locales" };
 
@@ -166,6 +167,8 @@ export default async function LocalesPage({ searchParams }: { searchParams: Prom
   const { mes } = await searchParams;
   const today = todayAR();
   const month = mes && /^\d{4}-\d{2}$/.test(mes) ? `${mes}-01` : monthStart(today);
+  const [py, pm] = month.split("-").map(Number);
+  const prevMonth = pm === 1 ? `${py - 1}-12-01` : `${py}-${String(pm - 1).padStart(2, "0")}-01`;
   const [team, store, { data: goals }] = await Promise.all([
     getTeam(),
     getStoreSales(supabase, month),
@@ -192,6 +195,9 @@ export default async function LocalesPage({ searchParams }: { searchParams: Prom
           <button className="btn-secondary py-2">Ver</button>
         </form>
       </div>
+      {me.is_admin && !(goals ?? []).length && (
+        <CopyLocalGoals fromMonth={prevMonth} toMonth={month} fromLabel={monthLabel(prevMonth)} />
+      )}
       {!store?.ok && <p className="card p-4 text-sm">⚠️ No se pudo leer la tienda online: {store ? store.error : "no está conectada"}.</p>}
 
       {locals.map((l) => (
@@ -225,6 +231,21 @@ export default async function LocalesPage({ searchParams }: { searchParams: Prom
                 </li>
               ))}
             </ul>
+            {me.is_admin && (
+              <details className="mt-4 text-sm">
+                <summary className="cursor-pointer font-medium text-stone-500 underline">➕ Cargar objetivo de otro vendedor</summary>
+                <ul className="mt-2 space-y-2">
+                  {team
+                    .filter((t) => t.active !== false && !l.sellers.some((s) => s.key === t.email))
+                    .map((t) => (
+                      <li key={t.email} className="flex flex-wrap items-center justify-between gap-2">
+                        <span>{t.name.split(" ")[0]}</span>
+                        <LocalGoalEditor month={month} local={l.id} seller={t.email} name={t.name.split(" ")[0]} count={null} ticket={null} />
+                      </li>
+                    ))}
+                </ul>
+              </details>
+            )}
           </div>
         </section>
       ))}
