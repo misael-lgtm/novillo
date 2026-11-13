@@ -869,3 +869,25 @@ El usuario quiere ver todos esos contactos en el tablero.
 - `localOf` acepta la nota en cualquier orden (P/G); `localChecks` en el snapshot para revisar diferencias.
 - Diseño: fondo #121212, barra de arriba siempre clara (`force-light`), colores fijos del ritmo (`pace-*`), pestañas de teléfonos verde WhatsApp, chats claros.
 - "Para llegar, por día" por canal (`toReachPerDay`) en el recuadro del objetivo y en Locales.
+
+## §43 Cambios desde el §42 (fines de octubre – noviembre 2026)
+
+**Incidente Vercel (27/10):** el proyecto quedó pausado ("402 Payment required / DEPLOYMENT_DISABLED") por consumo del plan gratis. La causa fue el cron `ventas-cada-minuto` (~30 s de función cada minuto). Misael pasó Vercel a **Pro**. Arreglos:
+- Migración `0030_reloj_cada_5_minutos`: se borró `ventas-cada-minuto`; queda **un solo cron** `auto-transferencias` cada 5 min que hace todo (ventas del mes + mensajes de transferencias + carritos), sin parámetro `parte`.
+- Migración `0031_snapshot_parcial` (aplicada): `merge_store_snapshot(p_key, p_month, p_seen, p_data)` y `store_snapshot_updated_at(p_key, p_month)`. El reloj lee de Tiendanube **solo los pedidos actualizados desde la última vez** (−5 min de margen) y los mezcla (reemplaza por id en `off`, `local`, `checks`, `localChecks`). Relee el mes entero si es la primera vuelta de cada hora (minuto UTC < 5), si hace +30 min que no se guardaba o con `?todo=1`. `storeSalesForMonth(month, { fresh, updatedSince })` devuelve `seen` (ids leídos), que no se guarda.
+- **Pendiente:** migración `0032_realtime` (archivo en el repo, **NO aplicada**: el MCP de Supabase pidió una confirmación al usuario y no llegó). Crea `live_ping` + trigger en `store_sales_snapshot` y agrega `wa_messages`, `wa_chats`, `wa_chat_labels`, `live_ping` a la publicación `supabase_realtime`. El cliente ya tiene `src/lib/live.ts` (`onLive(tablas, fn, fallbackMs, withoutLiveMs)`), usado por WaInbox, UnreadBadges, SaleCelebration, AutoRefresh y el contador de anuncios. Está con `LIVE_READY = false`, así que se sigue preguntando como antes (chats cada 3 s, no leídos 20 s, festejo y Locales 60 s). Para el ahorro: aplicar 0032 y poner `LIVE_READY = true` (chats pasan a 30 s de respaldo, el resto a 2–10 min). CartAlerts quedó en 3 min y Locales usa `AutoRefresh seconds={600}`.
+
+**Carritos abandonados:** `AUTO_CART.afterMinutes = 0` (el mensaje sale apenas aparece el carrito; la cola de carritos corre en cada vuelta del reloj, `queueCarts()` en la ruta). Sigue una vez por persona (0028) y sin compradores/vacíos.
+
+**Ventas que cuentan:** `payment_status` `paid`, `partially_refunded` y `partially_paid` (no cancelado) cuentan como venta en off y locales (facturación, cantidad y ticket). Se usa el `total` del pedido.
+
+**Diagnóstico** (`/api/auto/diagnostico`, con la clave del reloj vía pg_net):
+- `?solo=compradores&q=<regex>&desde=&hasta=&pagina=&paginas=` → compradores pagados de un producto (`productBuyers`). Tiendanube corta en 10.000 resultados: partir por mes.
+- `?solo=retiros&q=<regex>&desde=&hasta=&pagina=&paginas=` → pedidos cuyo envío/retiro coincide (ej. `g(u|ü)emes`) con pago, estado y nota (`pickupOrders`). Ojo: Tiendanube por local cuenta todo lo que se retira ahí (incluye off y web); el CRM solo cuenta "local/Nombre/Local".
+- `?solo=depositos` → muestra de stock por depósito (la app no tiene permiso `read_locations`, faltan los nombres; el stock del depósito México sigue pendiente).
+
+**Locales:** botón "📋 Copiar los objetivos de <mes anterior>" cuando el mes no tiene objetivos (`copyLocalGoals`, solo admin, no pisa) y "➕ Cargar objetivo de otro vendedor" en cada local (miembros del equipo sin ventas ni objetivo ese mes).
+
+**Respuestas rápidas cargadas en la base:** `/transfe` (datos bancarios: alias wayfarer.hg2026, CVU, CUIT, titular GR&MA INVESTMENTS SA) y `/carrito` (mensaje de Fabri con 5% OFF).
+
+**Datos sueltos entregados:** planilla de compradores de Pantalón Tom (ene 2025 – may 2026: 176 personas / 216 pedidos; las ventas de Tom arrancan en oct 2025). Quedaron tablas auxiliares `crm_private.tmp_tom` y `crm_private.tmp_tom2` sin borrar (la base no respondió al DROP); se pueden borrar.
