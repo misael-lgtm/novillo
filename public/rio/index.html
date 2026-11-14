@@ -155,7 +155,7 @@ form{display:flex;flex-direction:column;gap:12px}
     </div>
     <div class="card">
       <h2>Para quedar a mano</h2>
-      <p class="hint" style="margin-bottom:8px">La menor cantidad de transferencias posibles. Cuando alguien paga, tocá “Ya pagó”.</p>
+      <p class="hint" style="margin-bottom:8px">Cada uno le paga a quien puso la plata por los gastos que compartieron. Cuando alguien paga, tocá “Ya pagó”.</p>
       <div id="xferList"></div>
     </div>
     <div class="card">
@@ -260,18 +260,25 @@ form{display:flex;flex-direction:column;gap:12px}
     Object.keys(b).forEach(k => b[k]=r2(b[k]));
     return b;
   }
-  function transfers(b){
-    const cred = [], debt = [];
-    for (const [id,v] of Object.entries(b)){ if (v>0.009) cred.push({id,v}); else if (v<-0.009) debt.push({id,v:-v}); }
-    cred.sort((a,b)=>b.v-a.v); debt.sort((a,b)=>b.v-a.v);
-    const out=[]; let i=0,j=0;
-    while(i<debt.length && j<cred.length){
-      const m = r2(Math.min(debt[i].v, cred[j].v));
-      if (m>0.009) out.push({from:debt[i].id,to:cred[j].id,amt:m});
-      debt[i].v=r2(debt[i].v-m); cred[j].v=r2(cred[j].v-m);
-      if (debt[i].v<=0.009) i++; if (cred[j].v<=0.009) j++;
+  // Deudas de a pares: cada uno le debe a quien pagó su parte de los gastos que compartieron.
+  // Si dos personas se deben mutuamente, se compensa y queda una sola deuda entre ellas.
+  function transfers(){
+    const ids = new Set(state.people.map(p=>p.id)), d = {};
+    const add = (from,to,amt) => { if(from===to||!ids.has(from)||!ids.has(to)) return; const k=from+"|"+to; d[k]=(d[k]||0)+amt; };
+    for (const e of state.expenses){
+      if (e.type==="pago"){ add(e.to, e.from, e.brl); continue; }
+      const sp = (e.split||[]).filter(id=>ids.has(id)); if(!sp.length) continue;
+      const share = e.brl/sp.length;
+      sp.forEach(id => add(id, e.paidBy, share));
     }
-    return out;
+    const out=[], seen=new Set();
+    for (const k of Object.keys(d)){
+      const [a,b]=k.split("|"), pair=[a,b].sort().join("|"); if(seen.has(pair)) continue; seen.add(pair);
+      const net = r2((d[a+"|"+b]||0)-(d[b+"|"+a]||0));
+      if (net>0.009) out.push({from:a,to:b,amt:net}); else if (net<-0.009) out.push({from:b,to:a,amt:-net});
+    }
+    const order = id => state.people.findIndex(p=>p.id===id);
+    return out.sort((x,y)=>order(x.from)-order(y.from)||order(x.to)-order(y.to));
   }
 
   // ---- render
@@ -348,7 +355,7 @@ form{display:flex;flex-direction:column;gap:12px}
       $("xferList").innerHTML = ""; return;
     }
     const max = Math.max(1, ...Object.values(b).map(Math.abs));
-    const xs = transfers(b);
+    const xs = transfers();
     $("balList").innerHTML = state.people.map(p => {
       const v=b[p.id]||0, cls = v>0.009?"pos":v<-0.009?"neg":"";
       const paid = r2(state.expenses.filter(e=>e.type!=="pago"&&e.paidBy===p.id).reduce((s,e)=>s+e.brl,0));
