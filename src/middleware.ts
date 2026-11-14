@@ -76,5 +76,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // /conector/ es público: el instalador del conector de WhatsApp (sin claves) se baja desde el celu sin iniciar sesión.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|conector/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // /rio/ es público: las cuentas del viaje familiar a Río (página suelta, usa su propia base de Supabase, no la del CRM).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|conector/|rio/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
