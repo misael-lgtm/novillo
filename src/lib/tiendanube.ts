@@ -707,3 +707,49 @@ export async function pickupOrders(opts: { match: RegExp; from: string; to: stri
   }
   return { rows, next: page };
 }
+
+/** Variante de un pack o conjunto tal cual está en la tienda. */
+export type TnBundleVariant = { id: number; values: string[]; sku: string | null; barcode: string | null; stock: number | null; price: number };
+export type TnBundle = { id: number; name: string; attributes: string[]; image: string | null; published: boolean; variants: TnBundleVariant[] };
+
+/** Productos que se venden de a dos o más prendas (packs y conjuntos), con todas sus variantes y stock. */
+export async function bundleProducts(): Promise<{ ok: true; products: TnBundle[] } | { ok: false; error: string } | null> {
+  if (!isConnected()) return null;
+  const out: TnBundle[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const url = `${API}/${tiendanube.storeId}/products?per_page=200&page=${page}&fields=id,name,attributes,variants,images,published`;
+    const res = await fetch(url, { headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA }, next: { revalidate: 120 } });
+    if (res.status === 404) break;
+    if (!res.ok) return { ok: false, error: `Tiendanube respondió ${res.status}` };
+    const list = (await res.json()) as {
+      id: number;
+      name?: unknown;
+      published?: boolean;
+      attributes?: unknown[];
+      images?: { src?: string }[];
+      variants?: { id: number; values?: unknown[]; sku?: string | null; barcode?: string | null; stock?: number | null; price?: string | number | null; promotional_price?: string | number | null }[];
+    }[];
+    for (const p of list) {
+      const name = textOf(p.name).trim();
+      if (!/\b(pack|conjunto|combo|kit)\b/i.test(name)) continue;
+      out.push({
+        id: p.id,
+        name,
+        published: p.published !== false,
+        attributes: (p.attributes ?? []).map((a) => textOf(a).trim()),
+        image: p.images?.[0]?.src ?? null,
+        variants: (p.variants ?? []).map((v) => ({
+          id: v.id,
+          values: (v.values ?? []).map((x) => textOf(x).trim()),
+          sku: v.sku?.trim() || null,
+          barcode: v.barcode?.trim() || null,
+          stock: v.stock ?? null,
+          price: Number(v.promotional_price || v.price || 0),
+        })),
+      });
+    }
+    if (list.length < 200) break;
+  }
+  out.sort((a, b) => a.name.localeCompare(b.name, "es"));
+  return { ok: true, products: out };
+}

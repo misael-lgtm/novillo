@@ -2,7 +2,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { monthStart } from "@/lib/goals";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/env";
-import { inventoryProbe, monthDiagnosis, pendingTransferOrders, pickupOrders, productBuyers } from "@/lib/tiendanube";
+import { bundleProducts, inventoryProbe, monthDiagnosis, pendingTransferOrders, pickupOrders, productBuyers } from "@/lib/tiendanube";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -39,6 +39,7 @@ export async function GET(req: Request) {
     const r = await productBuyers({ match, from: u.get("desde")!, to: u.get("hasta")!, page: Math.max(1, Number(u.get("pagina")) || 1), pages: Math.min(12, Math.max(1, Number(u.get("paginas")) || 3)) });
     return Response.json(r, { headers: { "cache-control": "no-store" } });
   }
+  if (u.get("solo") === "packs") return Response.json(await bundleProducts(), { headers: { "cache-control": "no-store" } });
   if (u.get("solo") === "depositos") return Response.json(await inventoryProbe(), { headers: { "cache-control": "no-store" } });
   // Liviano: solo las transferencias sin confirmar de los últimos 30 días.
   if (u.get("solo") === "transferencias") {
