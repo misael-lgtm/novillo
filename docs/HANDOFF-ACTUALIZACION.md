@@ -891,3 +891,22 @@ El usuario quiere ver todos esos contactos en el tablero.
 **Respuestas rápidas cargadas en la base:** `/transfe` (datos bancarios: alias wayfarer.hg2026, CVU, CUIT, titular GR&MA INVESTMENTS SA) y `/carrito` (mensaje de Fabri con 5% OFF).
 
 **Datos sueltos entregados:** planilla de compradores de Pantalón Tom (ene 2025 – may 2026: 176 personas / 216 pedidos; las ventas de Tom arrancan en oct 2025). Quedaron tablas auxiliares `crm_private.tmp_tom` y `crm_private.tmp_tom2` sin borrar (la base no respondió al DROP); se pueden borrar.
+
+## 44. (25-26/11): packs y conjuntos en el PDV de Tiendanube + conjunto Camisa & Pantalón Tom
+
+**Qué pidió:** que en el PDV (punto de venta) de Tiendanube sea más fácil encontrar packs y conjuntos. **No lo quiere en el CRM.**
+
+**Cómo están cargados:** cada pack/conjunto es un producto con una opción "Combinacion" (ej. "Camisa Ladrillo + Bermuda Negra", "Negro + Off White", "Todo Negro") + "Talle". Hasta 325 variantes por producto. Todas tienen SKU (muchos raros, tipo `HV746LIBSR2U140--L`), ninguna tiene código de barras. El stock del conjunto se carga **a mano**, aparte del de las prendas sueltas. La web tiene un selector propio con circulitos de color y "Armá tu conjunto" que lee "Combinacion": **no cambiar esa opción en los productos reales**.
+
+**Lo que se probó y NO sirve:**
+- Separar la variante en 3 opciones (Camisa / Bermuda / Talle): el PDV igual muestra una lista plana de variantes. Se probó con un producto oculto y se borró.
+- Buscar por SKU en el PDV: Misael probó código completo, cortado y parcial; no le sirvió.
+- El PDV no se puede personalizar.
+
+**Ideas que quedaron ofrecidas, sin respuesta:** cargar códigos de barras a las variantes + hoja catálogo para escanear; página aparte (no CRM) con circulitos que diga el nombre exacto de la variante.
+
+**Hecho:** se creó en Tiendanube, **oculto y con stock 0**, "Conjunto Lino | Camisa & Pantalón Tom" (id 383746616): 10 colores de camisa × 5 de Tom × 5 talles = 250 variantes, $187.990 (20% off sobre $109.990 + $124.990), SKUs `CONJ-TOM-<CAMISA>-<PANTALON>-<TALLE>`. Falta que Misael le cargue fotos y stock y lo publique. Se crea con `/api/auto/crear-conjunto-tom?key=…` (no duplica si ya existe); la lista de colores está en `src/lib/conjunto-tom.ts`.
+
+**Diagnóstico nuevo:** `/api/auto/diagnostico?solo=productos&q=<regex>` lista productos con variantes, SKU, precio y stock.
+
+**Permisos:** la app de Tiendanube **ya puede editar productos** (crear y borrar funcionó).
