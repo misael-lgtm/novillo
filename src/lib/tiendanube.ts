@@ -707,3 +707,32 @@ export async function pickupOrders(opts: { match: RegExp; from: string; to: stri
   }
   return { rows, next: page };
 }
+
+/** Productos cuyo nombre coincide, con sus variantes, precio y stock (solo diagnóstico). */
+export async function productsMatching(match: RegExp) {
+  if (!isConnected()) return null;
+  const out: { id: number; name: string; published: boolean; attributes: string[]; images: number; variants: { values: string[]; sku: string | null; stock: number | null; price: string | null; promo: string | null }[] }[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const res = await fetch(`${API}/${tiendanube.storeId}/products?per_page=200&page=${page}&fields=id,name,attributes,variants,images,published`, {
+      headers: { Authentication: `bearer ${tiendanube.token}`, "User-Agent": UA },
+      cache: "no-store",
+    });
+    if (res.status === 404) break;
+    if (!res.ok) return { error: `Tiendanube respondió ${res.status}` };
+    const list = (await res.json()) as { id: number; name?: unknown; published?: boolean; attributes?: unknown[]; images?: unknown[]; variants?: { values?: unknown[]; sku?: string | null; stock?: number | null; price?: string | null; promotional_price?: string | null }[] }[];
+    for (const p of list) {
+      const name = textOf(p.name).trim();
+      if (!match.test(name)) continue;
+      out.push({
+        id: p.id,
+        name,
+        published: p.published !== false,
+        attributes: (p.attributes ?? []).map((a) => textOf(a)),
+        images: p.images?.length ?? 0,
+        variants: (p.variants ?? []).map((v) => ({ values: (v.values ?? []).map((x) => textOf(x)), sku: v.sku ?? null, stock: v.stock ?? null, price: v.price ?? null, promo: v.promotional_price ?? null })),
+      });
+    }
+    if (list.length < 200) break;
+  }
+  return { products: out };
+}
